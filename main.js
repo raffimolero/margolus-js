@@ -1,4 +1,5 @@
 var grid;
+// TODO: show parity block in table
 var parity = 1;
 var timerInterval;
 var hold = false;
@@ -83,29 +84,27 @@ function makeTile(x, y, w, h) {
     return tile;
 }
 
-// function OTCA(x, tRow, mRow, bRow, rule) {
-//     let neighbors = 0;
-//     for (let x2 = x - 1; x2 <= x + 1; x2++) {
-//         if (isOn(tRow[x2])) neighbors++;
-//         if (x2 !== x && isOn(mRow[x2])) neighbors++;
-//         if (isOn(bRow[x2])) neighbors++;
-//     }
-//     const section = isOn(mRow[x]) ? 'S' : 'B';
-//     mRow[x].set(rule[section][neighbors]);
-// }
+function encode(arr) {
+    return (arr[0] << 0) | (arr[1] << 4) | (arr[2] << 8) | (arr[3] << 12);
+}
+
+function decode(num) {
+    return [
+        (num >> 0) & 0b1111,
+        (num >> 4) & 0b1111,
+        (num >> 8) & 0b1111,
+        (num >> 12) & 0b1111,
+    ];
+}
 
 function margolus(tl, tr, bl, br, rule) {
     const output =
-        rule[
-            (tl.cellState << 0) |
-                (tr.cellState << 4) |
-                (bl.cellState << 8) |
-                (br.cellState << 12)
-        ];
-    tl.update((output >> 0) & 0b1111);
-    tr.update((output >> 4) & 0b1111);
-    bl.update((output >> 8) & 0b1111);
-    br.update((output >> 12) & 0b1111);
+        rule[encode([tl.cellState, tr.cellState, bl.cellState, br.cellState])];
+    const [tl2, tr2, bl2, br2] = decode(output);
+    tl.update(tl2);
+    tr.update(tr2);
+    bl.update(bl2);
+    br.update(br2);
 }
 
 function makeGrid(w, h, rule) {
@@ -136,24 +135,167 @@ function makeGrid(w, h, rule) {
     return grid;
 }
 
-function loadRule(rulename) {
+const rules = new Map();
+function addRule(ruleName, rule) {
+    rules.set(ruleName, rule);
+}
+
+function parseRule(ruleText) {
+    // TODO: support other margolus neighborhoods
+    const ruleStructureRegex = /@RULE (\S*)\n+symmetries:\s*(\w*)\n+([\s\S]*)/;
+    const ruleStructure = ruleStructureRegex.exec(ruleText);
+
+    if (
+        !funnyAssert(
+            ruleStructure,
+            'The rule is formatted wrong. I am not advanced enough to tell you what is wrong.',
+            'i must be literally illiterate because i cant read this'
+        )
+    ) {
+        return null;
+    }
+
+    const ruleName = ruleStructure[1];
+    const symmetries = ruleStructure[2];
+    let symmetry;
+    switch (symmetries) {
+        case 'none':
+            symmetry = [[0, 1, 2, 3]];
+            break;
+        case 'reflect':
+            symmetry = [
+                [0, 1, 2, 3],
+                [1, 0, 3, 2],
+            ];
+            break;
+        case 'rotate4':
+            symmetry = [
+                [0, 1, 2, 3],
+                [1, 2, 3, 0],
+                [2, 3, 0, 1],
+                [3, 0, 1, 2],
+            ];
+            break;
+        case 'rotate4reflect':
+            symmetry = [
+                [0, 1, 2, 3],
+                [1, 2, 3, 0],
+                [2, 3, 0, 1],
+                [3, 0, 1, 2],
+                [1, 0, 3, 2],
+                [0, 3, 2, 1],
+                [3, 2, 1, 0],
+                [2, 1, 0, 3],
+            ];
+            break;
+        case 'permute':
+        case '180':
+            funnyAssert(false, `${symmetries} is not supported at the moment.`);
+            break;
+        default:
+            funnyAssert(
+                false,
+                `The rule has an invalid symmetry: ${symmetries}. I only support none, reflect, rotate4, rotate4reflect.`,
+                'sim a tree? whats that'
+            );
+    }
+
+    const contents = ruleStructure[3];
+    // TODO: add variables
+    function ruleMatch(block, rule) {
+        for (let i = 0; i < 4; i++) {
+            if (block[i] !== rule[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function permute(arr, perm) {
+        return perm.map(i => arr[i]);
+    }
+
+    // TODO: compile the rule data into something that can be interpreted
+    const ruleLine =
+        /\s*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*:[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(?:\#.*)?/;
+    const ruleEmulator = [];
+    for (const line of contents.split('\n')) {
+        const ruleMatches = ruleLine.exec(line);
+        if (ruleMatches) {
+            const [_, tl1, tr1, bl1, br1, tl2, tr2, bl2, br2] = ruleMatches;
+            for (const permutation of symmetry) {
+                const idx = encode(permute([tl1, tr1, bl1, br1], permutation));
+                const out = encode(permute([tl2, tr2, bl2, br2], permutation));
+            }
+            continue;
+        }
+    }
+
+    // TODO: compile all possible transitions using the interpreter
+    const table = new Array(65536);
+    for (let i = 0; i < 65536; i++) {
+        const [tl, tr, bl, br] = decode(i);
+        for (const [_, tl1, tr1, bl1, br1, tl2, tr2, bl2, br2] of ruleLines) {
+            for (const permutation in symmetry) {
+                if (
+                    ruleMatch(
+                        permute([tl1, tr1, bl1, br1], permutation),
+                        decode(i)
+                    )
+                ) {
+                    table.push(encode(permute([tl2, tr2, bl2, br2], symmetry)));
+                } else {
+                    table.push(i);
+                }
+            }
+        }
+    }
+    return { name: ruleName, table };
+}
+
+function getAndParseRule() {
+    const rule = parseRule(document.getElementById('rule').value);
+    // TODO: see if anything needs to change
+    if (
+        funnyAssert(
+            rule,
+            "I couldn't get the rule for that RLE.",
+            'uh, no rule? anarchy?'
+        )
+    ) {
+        addRule(rule.name, rule.table);
+    }
+}
+
+function loadRule(ruleName) {
+    // do not automatically parse rule table when just reading a rule
+    // getAndParseRule();
+
+    const rule = rules.get(ruleName);
+    funnyAssert(
+        rule,
+        "I don't know this rule. Maybe you forgot to Load Rule?",
+        'this rule name unreadable frfr, misspelled or forgot to load?'
+    );
+    return rule;
+    /*
     return new Array(65536).fill(0x1234);
 
     // disabled
-    const emulated = /(\S*)Emulated/.exec(rulename);
-    if (emulated) rulename = emulated[1];
+    const emulated = /(\S*)Emulated/.exec(ruleName);
+    if (emulated) ruleName = emulated[1];
     const aliases = {
         Life: 'B3S23',
         Seeds: 'B2S',
     };
-    if (rulename in aliases) rulename = aliases[rulename];
+    if (ruleName in aliases) ruleName = aliases[ruleName];
 
     const regex = /B(\d*)S(\d*)/;
-    const matches = regex.exec(rulename);
+    const matches = regex.exec(ruleName);
     if (
         !funnyAssert(
             matches,
-            `i cant load '${rulename}' as a rule`,
+            `i cant load '${ruleName}' as a rule`,
             'this rule name is as jarring as your handwriting'
         )
     )
@@ -166,8 +308,10 @@ function loadRule(rulename) {
     for (let b of matches[1]) rule.B[parseInt(b)] = 1;
     for (let s of matches[2]) rule.S[parseInt(s)] = 1;
     return rule;
+    */
 }
 
+// TODO: support multistate RLEs
 function loadPattern(grid, pattern) {
     const regex = /(\d*)([\D])/g;
     const rows = grid.childNodes;
@@ -193,9 +337,9 @@ function loadPattern(grid, pattern) {
     }
 }
 
-function load(rle) {
-    if (!rle) rle = 'x = 34, y = 21, rule = NaiveLifeEmulated';
-    const regex = /x = (\d*), y = (\d*), rule = (Naive)?(\S*)\n?(.*)/;
+function loadRle(rle) {
+    if (!rle) rle = 'x = 34, y = 21, rule = BBM';
+    const regex = /x = (\d*), y = (\d*), rule = (\S*)\n(.*)/;
     const matches = regex.exec(rle);
     if (
         !funnyAssert(
@@ -207,15 +351,7 @@ function load(rle) {
         return;
     const width = parseInt(matches[1]) + 2;
     const height = parseInt(matches[2]) + 2;
-    if (
-        !funnyAssert(
-            matches[3],
-            'i cant handle naivent rules',
-            'there is more wisdom in this rule than your head smh'
-        )
-    )
-        return;
-    const rule = loadRule(matches[4]);
+    const rule = loadRule(matches[3]);
 
     const pattern = matches[5];
     if (grid) document.body.removeChild(grid);
@@ -224,8 +360,8 @@ function load(rle) {
     loadPattern(grid, pattern);
 }
 
-function loadRle() {
-    load(document.getElementById('rle').value);
+function getAndLoadRle() {
+    loadRle(document.getElementById('rle').value);
 }
 
 function step() {
@@ -261,4 +397,5 @@ function run() {
     }
 }
 
-loadRle();
+getAndParseRule();
+getAndLoadRle();
