@@ -19,10 +19,32 @@ label {
   display: block;
 }
 
-input[type="radio"] {
-  position: absolute;
-  opacity: 0;
-  margin: 0;
+button:hover {
+  cursor: pointer;
+}
+
+.tile.palette:hover {
+  cursor: pointer;
+  height: 18px;
+  width: 18px;
+  margin: 1px;
+}
+
+.tile.palette:active {
+  height: 16px;
+  width: 16px;
+  margin: 2px;
+}
+
+.tile.palette.selected:not(:active) {
+  margin: 1px;
+  height: 18px;
+  width: 18px;
+
+}
+
+.tile.palette.selected {
+  border: 1px white solid;
 }
 
 .tile {

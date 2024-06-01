@@ -9,6 +9,7 @@ function makePalette() {
     document.body.appendChild(table);
     const palette = document.createElement('tr');
     table.appendChild(palette);
+    const tiles = [];
     for (let i = 0; i < 16; i++) {
         // make color
         let [l, h] = i & 8 ? ['40', 'c0'] : ['00', 'ff'];
@@ -21,28 +22,22 @@ function makePalette() {
         // make tile radio button
         const tile = document.createElement('td');
         palette.appendChild(tile);
-        tile.className = 'tile palette';
+        tile.className = 'tile';
+
+        const colorDisplay = document.createElement('div');
+        tile.appendChild(colorDisplay);
+        colorDisplay.className = 'tile palette';
+        colorDisplay.style.backgroundColor = color;
+        // label.cellState = i;
+
+        tiles.push(colorDisplay);
         tile.onclick = e => {
-            console.log(brush);
+            for (const tile of tiles) {
+                tile.classList.remove('selected');
+            }
+            colorDisplay.classList.add('selected');
+            brush = i;
         };
-
-        const label = document.createElement('label');
-        tile.appendChild(label);
-        label.className = 'tile';
-        label.htmlFor = i;
-
-        const input = document.createElement('input');
-        label.appendChild(input);
-        input.type = 'radio';
-        input.value = i;
-        input.name = 'brush';
-
-        // const cell = document.createElement('div');
-        // label.appendChild(cell);
-        // cell.className = 'tile brush';
-
-        label.style.backgroundColor = color;
-        label.cellState = i;
     }
 }
 makePalette();
