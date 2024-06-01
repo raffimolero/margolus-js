@@ -1,8 +1,9 @@
 var grid;
+var parity = 0;
 var interval;
 var hold = false;
-var brush = 0;
-var activeBrush = brush;
+var selectedColor = 0;
+var activeBrush = selectedColor;
 
 var colors = [];
 function makePalette() {
@@ -36,7 +37,7 @@ function makePalette() {
                 tile.classList.remove('selected');
             }
             colorDisplay.classList.add('selected');
-            brush = i;
+            selectedColor = i;
         };
         tile.onclick = click;
         if (i == 1) {
@@ -54,7 +55,7 @@ function funnyAssert(value, error, bonus) {
     return value;
 }
 
-function makeTile() {
+function makeTile(x, y) {
     const tile = document.createElement('td');
     tile.className = 'tile';
     tile.set = state => {
@@ -63,55 +64,76 @@ function makeTile() {
     };
     const set = e => {
         if (!hold) return;
+        // console.log(x, y);
         tile.set(activeBrush);
     };
     tile.onmousedown = e => {
         hold = true;
-        activeBrush = brush == tile.cellState ? 0 : brush;
-        set();
+        activeBrush = selectedColor == tile.cellState ? 0 : selectedColor;
+        set(null);
     };
     tile.onmouseup = e => (hold = false);
     tile.onmouseenter = set;
     return tile;
 }
 
-function makeRow(w) {
+function makeRow(w, y) {
     const row = document.createElement('tr');
-    for (let x = 0; x < w; x++) row.appendChild(makeTile());
+    for (let x = 0; x < w; x++) row.appendChild(makeTile(x, y));
     return row;
 }
 
-function OTCA(x, tRow, mRow, bRow, rule) {
-    let neighbors = 0;
-    for (let x2 = x - 1; x2 <= x + 1; x2++) {
-        if (isOn(tRow[x2])) neighbors++;
-        if (x2 !== x && isOn(mRow[x2])) neighbors++;
-        if (isOn(bRow[x2])) neighbors++;
-    }
-    const section = isOn(mRow[x]) ? 'S' : 'B';
-    mRow[x].set(rule[section][neighbors]);
+// function OTCA(x, tRow, mRow, bRow, rule) {
+//     let neighbors = 0;
+//     for (let x2 = x - 1; x2 <= x + 1; x2++) {
+//         if (isOn(tRow[x2])) neighbors++;
+//         if (x2 !== x && isOn(mRow[x2])) neighbors++;
+//         if (isOn(bRow[x2])) neighbors++;
+//     }
+//     const section = isOn(mRow[x]) ? 'S' : 'B';
+//     mRow[x].set(rule[section][neighbors]);
+// }
+
+function margolus(tl, tr, bl, br, rule) {
+    const output =
+        rule[
+            (tl.cellState << 0) |
+                (tr.cellState << 4) |
+                (bl.cellState << 8) |
+                (br.cellState << 12)
+        ];
+    tl.set((output >> 0) & 0b1111);
+    tr.set((output >> 4) & 0b1111);
+    bl.set((output >> 8) & 0b1111);
+    br.set((output >> 12) & 0b1111);
 }
 
 function makeGrid(w, h, rule) {
     const grid = document.createElement('table');
     grid.step = () => {
         const rows = grid.childNodes;
-        let tRow;
-        let mRow = rows[0].childNodes;
-        let bRow = rows[1].childNodes;
-        for (let y = 1; y < h - 1; y++) {
-            tRow = mRow;
-            mRow = bRow;
-            bRow = rows[y + 1].childNodes;
-            for (let x = 1; x < w - 1; x++) OTCA(x, tRow, mRow, bRow, rule);
+        for (let y = parity; y < h - 1; y += 2) {
+            const tRow = rows[y].childNodes;
+            const bRow = rows[y + 1].childNodes;
+            for (let x = parity; x < w - 1; x += 2) {
+                const tl = tRow[x];
+                const tr = tRow[x + 1];
+                const bl = bRow[x];
+                const br = bRow[x + 1];
+                margolus(tl, tr, bl, br, rule);
+            }
         }
+        parity = +!parity;
     };
     grid.onmousedown = e => e.preventDefault();
-    for (let y = 0; y < h; y++) grid.appendChild(makeRow(w));
+    for (let y = 0; y < h; y++) grid.appendChild(makeRow(w, y));
     return grid;
 }
 
 function loadRule(rulename) {
+    return new Array(65536).fill(0x1234);
+
+    // disabled
     const emulated = /(\S*)Emulated/.exec(rulename);
     if (emulated) rulename = emulated[1];
     const aliases = {
@@ -196,6 +218,10 @@ function load(rle) {
     loadPattern(grid, pattern);
 }
 
+function loadRle() {
+    load(document.getElementById('rle').value);
+}
+
 function step() {
     if (
         funnyAssert(
@@ -225,3 +251,5 @@ function run() {
         interval = setInterval(step, document.getElementById('delay').value);
     }
 }
+
+loadRle();
