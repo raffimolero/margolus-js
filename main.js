@@ -2,6 +2,7 @@ var grid;
 var interval;
 var hold = false;
 var brush = 0;
+var activeBrush = brush;
 
 var colors = [];
 function makePalette() {
@@ -28,16 +29,19 @@ function makePalette() {
         tile.appendChild(colorDisplay);
         colorDisplay.className = 'tile palette';
         colorDisplay.style.backgroundColor = color;
-        // label.cellState = i;
 
         tiles.push(colorDisplay);
-        tile.onclick = e => {
+        const click = () => {
             for (const tile of tiles) {
                 tile.classList.remove('selected');
             }
             colorDisplay.classList.add('selected');
             brush = i;
         };
+        tile.onclick = click;
+        if (i == 1) {
+            click();
+        }
     }
 }
 makePalette();
@@ -59,11 +63,11 @@ function makeTile() {
     };
     const set = e => {
         if (!hold) return;
-        tile.set(brush);
+        tile.set(activeBrush);
     };
     tile.onmousedown = e => {
         hold = true;
-        brush = +!tile.cellState;
+        activeBrush = brush == tile.cellState ? 0 : brush;
         set();
     };
     tile.onmouseup = e => (hold = false);
