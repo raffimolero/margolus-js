@@ -1,6 +1,6 @@
 var grid;
-var parity = 0;
-var interval;
+var parity = 1;
+var timerInterval;
 var hold = false;
 var selectedColor = 0;
 var activeBrush = selectedColor;
@@ -40,6 +40,8 @@ function makePalette() {
             selectedColor = i;
         };
         tile.onclick = click;
+
+        // auto select color state 1
         if (i == 1) {
             click();
         }
@@ -55,14 +57,18 @@ function funnyAssert(value, error, bonus) {
     return value;
 }
 
-function makeTile(x, y) {
+function makeTile(x, y, w, h) {
     const tile = document.createElement('td');
     tile.className = 'tile';
     tile.set = state => {
         tile.cellState = state;
         tile.style.backgroundColor = colors[state];
     };
-    const set = e => {
+    tile.update = state => {
+        if (x == 0 || x == w - 1 || (y == 0) | (y == h - 1)) return;
+        tile.set(state);
+    };
+    const mouseSet = e => {
         if (!hold) return;
         // console.log(x, y);
         tile.set(activeBrush);
@@ -70,17 +76,11 @@ function makeTile(x, y) {
     tile.onmousedown = e => {
         hold = true;
         activeBrush = selectedColor == tile.cellState ? 0 : selectedColor;
-        set(null);
+        mouseSet(e);
     };
     tile.onmouseup = e => (hold = false);
-    tile.onmouseenter = set;
+    tile.onmouseenter = mouseSet;
     return tile;
-}
-
-function makeRow(w, y) {
-    const row = document.createElement('tr');
-    for (let x = 0; x < w; x++) row.appendChild(makeTile(x, y));
-    return row;
 }
 
 // function OTCA(x, tRow, mRow, bRow, rule) {
@@ -102,10 +102,10 @@ function margolus(tl, tr, bl, br, rule) {
                 (bl.cellState << 8) |
                 (br.cellState << 12)
         ];
-    tl.set((output >> 0) & 0b1111);
-    tr.set((output >> 4) & 0b1111);
-    bl.set((output >> 8) & 0b1111);
-    br.set((output >> 12) & 0b1111);
+    tl.update((output >> 0) & 0b1111);
+    tr.update((output >> 4) & 0b1111);
+    bl.update((output >> 8) & 0b1111);
+    br.update((output >> 12) & 0b1111);
 }
 
 function makeGrid(w, h, rule) {
@@ -126,7 +126,13 @@ function makeGrid(w, h, rule) {
         parity = +!parity;
     };
     grid.onmousedown = e => e.preventDefault();
-    for (let y = 0; y < h; y++) grid.appendChild(makeRow(w, y));
+    for (let y = 0; y < h; y++) {
+        const row = document.createElement('tr');
+        grid.appendChild(row);
+        for (let x = 0; x < w; x++) {
+            row.appendChild(makeTile(x, y, w, h));
+        }
+    }
     return grid;
 }
 
@@ -242,13 +248,16 @@ function run() {
         )
     )
         return;
-    if (interval) {
+    if (timerInterval) {
         document.getElementById('run').innerHTML = 'Start';
-        clearInterval(interval);
-        interval = null;
+        clearInterval(timerInterval);
+        timerInterval = null;
     } else {
         document.getElementById('run').innerHTML = 'Stop';
-        interval = setInterval(step, document.getElementById('delay').value);
+        timerInterval = setInterval(
+            step,
+            document.getElementById('delay').value
+        );
     }
 }
 
