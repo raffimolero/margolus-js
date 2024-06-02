@@ -131,8 +131,7 @@ function makeGrid(w, h, rule) {
                 margolus(a, b, c, d, rule);
             }
         }
-        parity ^= 1;
-        grid.updateBorders();
+        switchParity();
     };
     grid.updateBorders = () => {
         for (const row of grid.childNodes) {
@@ -365,6 +364,11 @@ function loadRle(rle) {
 
 function getAndLoadRle() {
     loadRle(document.getElementById('rle').value);
+}
+
+function switchParity() {
+    parity ^= 1;
+    grid.updateBorders();
 }
 
 function step() {
