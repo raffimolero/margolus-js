@@ -97,14 +97,14 @@ function decode(num) {
     ];
 }
 
-function margolus(tl, tr, bl, br, rule) {
+function margolus(a, b, c, d, rule) {
     const output =
-        rule[encode([tl.cellState, tr.cellState, bl.cellState, br.cellState])];
-    const [tl2, tr2, bl2, br2] = decode(output);
-    tl.update(tl2);
-    tr.update(tr2);
-    bl.update(bl2);
-    br.update(br2);
+        rule[encode([a.cellState, b.cellState, c.cellState, d.cellState])];
+    const [e, f, g, h] = decode(output);
+    a.update(e);
+    b.update(f);
+    c.update(g);
+    d.update(h);
 }
 
 function makeGrid(w, h, rule) {
@@ -115,11 +115,11 @@ function makeGrid(w, h, rule) {
             const tRow = rows[y].childNodes;
             const bRow = rows[y + 1].childNodes;
             for (let x = parity; x < w - 1; x += 2) {
-                const tl = tRow[x];
-                const tr = tRow[x + 1];
-                const bl = bRow[x];
-                const br = bRow[x + 1];
-                margolus(tl, tr, bl, br, rule);
+                const a = tRow[x];
+                const b = tRow[x + 1];
+                const c = bRow[x];
+                const d = bRow[x + 1];
+                margolus(a, b, c, d, rule);
             }
         }
         parity = +!parity;
@@ -171,21 +171,21 @@ function parseRule(ruleText) {
         case 'rotate4':
             symmetry = [
                 [0, 1, 2, 3],
-                [1, 2, 3, 0],
-                [2, 3, 0, 1],
-                [3, 0, 1, 2],
+                [1, 3, 0, 2],
+                [3, 2, 1, 0],
+                [2, 0, 3, 1],
             ];
             break;
         case 'rotate4reflect':
             symmetry = [
                 [0, 1, 2, 3],
-                [1, 2, 3, 0],
-                [2, 3, 0, 1],
-                [3, 0, 1, 2],
-                [1, 0, 3, 2],
-                [0, 3, 2, 1],
+                [1, 3, 0, 2],
                 [3, 2, 1, 0],
-                [2, 1, 0, 3],
+                [2, 0, 3, 1],
+                [1, 0, 3, 2],
+                [3, 1, 2, 0],
+                [2, 3, 0, 1],
+                [0, 2, 1, 3],
             ];
             break;
         case 'permute':
@@ -202,14 +202,6 @@ function parseRule(ruleText) {
 
     const contents = ruleStructure[3];
     // TODO: add variables
-    function ruleMatch(block, rule) {
-        for (let i = 0; i < 4; i++) {
-            if (block[i] !== rule[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
 
     function permute(arr, perm) {
         return perm.map(i => arr[i]);
@@ -222,34 +214,39 @@ function parseRule(ruleText) {
     for (const line of contents.split('\n')) {
         const ruleMatches = ruleLine.exec(line);
         if (ruleMatches) {
-            const [_, tl1, tr1, bl1, br1, tl2, tr2, bl2, br2] = ruleMatches;
+            const [_, a, b, c, d, e, f, g, h] = ruleMatches;
             for (const permutation of symmetry) {
-                const idx = encode(permute([tl1, tr1, bl1, br1], permutation));
-                const out = encode(permute([tl2, tr2, bl2, br2], permutation));
+                const idx = encode(permute([a, b, c, d], permutation));
+                const out = encode(permute([e, f, g, h], permutation));
+                ruleEmulator.push([idx, out]);
             }
             continue;
         }
+        // TODO: other types of line
+    }
+    for (const [idx, out] of ruleEmulator) {
+        console.log(decode(idx));
+        console.log(decode(out));
+        console.log('---');
     }
 
     // TODO: compile all possible transitions using the interpreter
-    const table = new Array(65536);
+    const table = [];
     for (let i = 0; i < 65536; i++) {
+        table.push(i);
         const [tl, tr, bl, br] = decode(i);
-        for (const [_, tl1, tr1, bl1, br1, tl2, tr2, bl2, br2] of ruleLines) {
-            for (const permutation in symmetry) {
-                if (
-                    ruleMatch(
-                        permute([tl1, tr1, bl1, br1], permutation),
-                        decode(i)
-                    )
-                ) {
-                    table.push(encode(permute([tl2, tr2, bl2, br2], symmetry)));
-                } else {
-                    table.push(i);
-                }
+        for (const [idx, out] of ruleEmulator) {
+            if (i == idx) {
+                table[i] = out;
+                console.log(idx, out);
+                break;
             }
         }
     }
+    console.log(table);
+    // for (const n of table) {
+    //     console.log(n);
+    // }
     return { name: ruleName, table };
 }
 
