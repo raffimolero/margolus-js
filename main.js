@@ -3,6 +3,7 @@ var grid;
 var parity = 1;
 var timerInterval;
 var hold = false;
+document.onmouseup = e => (hold = false);
 var selectedColor = 0;
 var activeBrush = selectedColor;
 
@@ -87,7 +88,6 @@ function makeTile(x, y, w, h) {
         activeBrush = selectedColor == tile.cellState ? 0 : selectedColor;
         mouseSet(e);
     };
-    tile.onmouseup = e => (hold = false);
     tile.onmouseenter = mouseSet;
     tile.updateBorders();
     return tile;
