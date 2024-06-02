@@ -70,7 +70,6 @@ function makeTile(x, y, w, h) {
     tile.update = state => {
         if (x == 0 || x == w - 1 || (y == 0) | (y == h - 1)) return;
         tile.set(state);
-        tile.updateBorders();
     };
     tile.updateBorders = () => {
         tile.style.borderTopColor = (y ^ parity) & 1 ? active : inactive;
@@ -90,6 +89,7 @@ function makeTile(x, y, w, h) {
     };
     tile.onmouseup = e => (hold = false);
     tile.onmouseenter = mouseSet;
+    tile.updateBorders();
     return tile;
 }
 
@@ -117,6 +117,7 @@ function margolus(a, b, c, d, rule) {
 }
 
 function makeGrid(w, h, rule) {
+    parity = 1;
     const grid = document.createElement('table');
     grid.step = () => {
         const rows = grid.childNodes;
@@ -148,8 +149,6 @@ function makeGrid(w, h, rule) {
             row.appendChild(makeTile(x, y, w, h));
         }
     }
-    parity = 1;
-    grid.updateBorders();
     return grid;
 }
 
@@ -378,29 +377,43 @@ function step() {
             'load something pls',
             'yes of course lemme just make a step with no feet'
         )
-    )
+    ) {
         grid.step();
+    }
 }
 
-function run() {
+function stepButton() {
+    step();
+    stop();
+}
+
+function stop() {
+    document.getElementById('run').innerHTML = 'Start';
+    clearInterval(timerInterval);
+    timerInterval = null;
+}
+
+function start() {
+    document.getElementById('run').innerHTML = 'Stop';
+    timerInterval = setInterval(step, document.getElementById('delay').value);
+}
+
+function toggleRun() {
     if (
         !funnyAssert(
             grid,
             'load pattern pls',
             'do you really expect me to run with no legs'
         )
-    )
+    ) {
         return;
+    }
+
     if (timerInterval) {
-        document.getElementById('run').innerHTML = 'Start';
-        clearInterval(timerInterval);
-        timerInterval = null;
+        stop();
     } else {
-        document.getElementById('run').innerHTML = 'Stop';
-        timerInterval = setInterval(
-            step,
-            document.getElementById('delay').value
-        );
+        step();
+        start();
     }
 }
 

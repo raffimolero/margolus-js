@@ -1,5 +1,5 @@
 body, * {
-  background-color: black;
+  background-color: #202020;
   color: white;
   font-family: Comic Sans MS;
   margin: 2px;
@@ -7,48 +7,74 @@ body, * {
 }
 
 input, textarea, button, .tile {
-  border: 1px #404040 solid;
+  border: 1px solid #404040;
+}
+
+button {
+  padding: 0.5em 1em;
+  background-color: #606060;
+  border-radius: 8px;
+}
+button:hover {
+  background-color: #808080;
+}
+button:active {
+  background-color: #404040;
+}
+
+input, textarea {
+  background-color: black;
+}
+
+#delay-label {
+  font-size: small;
+}
+input {
+  font-size: large;
 }
 
 table {  
-  border: 2px #808080 solid;
+  border: 2px solid #808080;
   border-collapse: collapse;
-}
-
-label {
-  display: block;
 }
 
 button:hover {
   cursor: pointer;
 }
 
-.tile.palette:hover {
-  cursor: pointer;
-  height: 18px;
-  width: 18px;
-  margin: 1px;
-}
-
-.tile.palette:active {
-  height: 16px;
-  width: 16px;
-  margin: 2px;
-}
-
-.tile.palette.selected:not(:active) {
-  margin: 1px;
-  height: 18px;
-  width: 18px;
-
-}
-
-.tile.palette.selected {
-  border: 1px white solid;
+#delay {
+  width: 4em;
 }
 
 .tile {
   padding: 0;
-  height: 16px;
   width: 16px;
+  height: 16px;
+  background-color: black;
+}
+
+.tile.palette {
+  width: 24px;
+  height: 24px;
+  margin: 6px;
+  border: 2px solid #808080;
+}
+.tile.palette:hover {
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  margin: 4px;
+}
+.tile.palette:active {
+  width: 24px;
+  height: 24px;
+  margin: 6px;
+}
+.tile.palette.selected:not(:hover) {
+  width: 30px;
+  height: 30px;
+  margin: 3px;
+}
+.tile.palette.selected {
+  border: 2px solid white;
 }
