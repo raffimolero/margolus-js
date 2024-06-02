@@ -130,22 +130,16 @@ function makeGrid(w, h, rule) {
                 const d = bRow[x + 1];
                 margolus(a, b, c, d, rule);
             }
-
-            // update borders
-            tRow[0].updateBorders();
-            tRow[w - 1].updateBorders();
-            bRow[0].updateBorders();
-            bRow[w - 1].updateBorders();
-        }
-
-        // update borders
-        const tRow = rows[0].childNodes;
-        const bRow = rows[h - 1].childNodes;
-        for (let x = 0; x < w; x++) {
-            tRow[x].updateBorders();
-            bRow[x].updateBorders();
         }
         parity ^= 1;
+        grid.updateBorders();
+    };
+    grid.updateBorders = () => {
+        for (const row of grid.childNodes) {
+            for (const tile of row.childNodes) {
+                tile.updateBorders();
+            }
+        }
     };
     grid.onmousedown = e => e.preventDefault();
     for (let y = 0; y < h; y++) {
@@ -155,8 +149,8 @@ function makeGrid(w, h, rule) {
             row.appendChild(makeTile(x, y, w, h));
         }
     }
-    parity = 0;
-    grid.step();
+    parity = 1;
+    grid.updateBorders();
     return grid;
 }
 
