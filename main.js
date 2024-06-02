@@ -65,9 +65,18 @@ function makeTile(x, y, w, h) {
         tile.cellState = state;
         tile.style.backgroundColor = colors[state];
     };
+    const active = '#808080';
+    const inactive = '#404040';
     tile.update = state => {
         if (x == 0 || x == w - 1 || (y == 0) | (y == h - 1)) return;
         tile.set(state);
+        tile.updateBorders();
+    };
+    tile.updateBorders = () => {
+        tile.style.borderTopColor = (y ^ parity) & 1 ? active : inactive;
+        tile.style.borderBottomColor = (y ^ parity) & 1 ? active : inactive;
+        tile.style.borderLeftColor = (x ^ parity) & 1 ? active : inactive;
+        tile.style.borderRightColor = (x ^ parity) & 1 ? active : inactive;
     };
     const mouseSet = e => {
         if (!hold) return;
@@ -121,8 +130,22 @@ function makeGrid(w, h, rule) {
                 const d = bRow[x + 1];
                 margolus(a, b, c, d, rule);
             }
+
+            // update borders
+            tRow[0].updateBorders();
+            tRow[w - 1].updateBorders();
+            bRow[0].updateBorders();
+            bRow[w - 1].updateBorders();
         }
-        parity = +!parity;
+
+        // update borders
+        const tRow = rows[0].childNodes;
+        const bRow = rows[h - 1].childNodes;
+        for (let x = 0; x < w; x++) {
+            tRow[x].updateBorders();
+            bRow[x].updateBorders();
+        }
+        parity ^= 1;
     };
     grid.onmousedown = e => e.preventDefault();
     for (let y = 0; y < h; y++) {
@@ -132,6 +155,8 @@ function makeGrid(w, h, rule) {
             row.appendChild(makeTile(x, y, w, h));
         }
     }
+    parity = 0;
+    grid.step();
     return grid;
 }
 
@@ -190,6 +215,8 @@ function parseAndAddRule(ruleText) {
             [0, 2, 1, 3],
         ],
     };
+
+    const symmetryRegex = /\s*symmetries\s*:\s*(\w*)\s*(?:#.*)?/;
     function parseSymmetry(symmetries) {
         const symmetry = symmetryMap[symmetries];
         if (symmetryMap) {
@@ -230,7 +257,6 @@ function parseAndAddRule(ruleText) {
 
     // TODO: compile the rule data into something that can be interpreted
 
-    const symmetryRegex = /\s*symmetries\s*:\s*(\w*)\s*(?:#.*)?/;
     const ruleLine =
         /\s*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*:[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(?:\#.*)?/;
 
@@ -241,6 +267,7 @@ function parseAndAddRule(ruleText) {
         if (symmetryMatches?.index == 0) {
             symmetry = parseSymmetry(symmetryMatches[1]);
         }
+
         const ruleMatches = ruleLine.exec(line);
         if (ruleMatches?.index == 0) {
             const [_, a, b, c, d, e, f, g, h] = ruleMatches;
@@ -251,6 +278,7 @@ function parseAndAddRule(ruleText) {
             }
             continue;
         }
+
         // TODO: other types of line
     }
     // for (const [idx, out] of ruleEmulator) {
