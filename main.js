@@ -140,8 +140,9 @@ function addRule(ruleName, rule) {
     rules.set(ruleName, rule);
 }
 
-function parseRule(ruleText) {
+function parseAndAddRule(ruleText) {
     // TODO: support other margolus neighborhoods
+    // like square4cyclic
     const ruleStructureRegex = /@RULE (\S*)\n+symmetries:\s*(\w*)\n+([\s\S]*)/;
     const ruleStructure = ruleStructureRegex.exec(ruleText);
 
@@ -156,8 +157,18 @@ function parseRule(ruleText) {
     }
 
     const ruleName = ruleStructure[1];
+    if (
+        !funnyAssert(
+            ruleName,
+            "I couldn't get the rule name for that RLE.",
+            'uh, no rule? anarchy?'
+        )
+    ) {
+        return null;
+    }
+
     const symmetries = ruleStructure[2];
-    let symmetry;
+    let symmetry = [];
     switch (symmetries) {
         case 'none':
             symmetry = [[0, 1, 2, 3]];
@@ -188,9 +199,19 @@ function parseRule(ruleText) {
                 [0, 2, 1, 3],
             ];
             break;
-        case 'permute':
         case '180':
-            funnyAssert(false, `${symmetries} is not supported at the moment.`);
+            funnyAssert(
+                false,
+                `${symmetries} is not supported at the moment.`,
+                'rotate bad'
+            );
+            break;
+        case 'permute':
+            funnyAssert(
+                false,
+                'Permute symmetry does not make sense for Margolus.',
+                'think about it for a moment. think about permuting a margolus neighborhood.'
+            );
             break;
         default:
             funnyAssert(
@@ -224,11 +245,11 @@ function parseRule(ruleText) {
         }
         // TODO: other types of line
     }
-    for (const [idx, out] of ruleEmulator) {
-        console.log(decode(idx));
-        console.log(decode(out));
-        console.log('---');
-    }
+    // for (const [idx, out] of ruleEmulator) {
+    //     console.log(decode(idx));
+    //     console.log(decode(out));
+    //     console.log('---');
+    // }
 
     // TODO: compile all possible transitions using the interpreter
     const table = [];
@@ -238,36 +259,22 @@ function parseRule(ruleText) {
         for (const [idx, out] of ruleEmulator) {
             if (i == idx) {
                 table[i] = out;
-                console.log(idx, out);
+                // console.log(idx, out);
                 break;
             }
         }
     }
-    console.log(table);
-    // for (const n of table) {
-    //     console.log(n);
-    // }
-    return { name: ruleName, table };
+    // console.log(table);
+    addRule(ruleName, table);
+    return ruleName;
 }
 
 function getAndParseRule() {
-    const rule = parseRule(document.getElementById('rule').value);
-    // TODO: see if anything needs to change
-    if (
-        funnyAssert(
-            rule,
-            "I couldn't get the rule for that RLE.",
-            'uh, no rule? anarchy?'
-        )
-    ) {
-        addRule(rule.name, rule.table);
-    }
+    const rule = parseAndAddRule(document.getElementById('rule').value);
+    loadRule(rule);
 }
 
 function loadRule(ruleName) {
-    // do not automatically parse rule table when just reading a rule
-    // getAndParseRule();
-
     const rule = rules.get(ruleName);
     funnyAssert(
         rule,
@@ -275,37 +282,6 @@ function loadRule(ruleName) {
         'this rule name unreadable frfr, misspelled or forgot to load?'
     );
     return rule;
-    /*
-    return new Array(65536).fill(0x1234);
-
-    // disabled
-    const emulated = /(\S*)Emulated/.exec(ruleName);
-    if (emulated) ruleName = emulated[1];
-    const aliases = {
-        Life: 'B3S23',
-        Seeds: 'B2S',
-    };
-    if (ruleName in aliases) ruleName = aliases[ruleName];
-
-    const regex = /B(\d*)S(\d*)/;
-    const matches = regex.exec(ruleName);
-    if (
-        !funnyAssert(
-            matches,
-            `i cant load '${ruleName}' as a rule`,
-            'this rule name is as jarring as your handwriting'
-        )
-    )
-        return;
-
-    var rule = {
-        B: [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        S: [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    };
-    for (let b of matches[1]) rule.B[parseInt(b)] = 1;
-    for (let s of matches[2]) rule.S[parseInt(s)] = 1;
-    return rule;
-    */
 }
 
 // TODO: support multistate RLEs
