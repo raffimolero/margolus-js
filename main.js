@@ -9,8 +9,7 @@ var activeBrush = selectedColor;
 
 var colors = [];
 function makePalette() {
-    const table = document.createElement('table');
-    document.body.appendChild(table);
+    const table = document.getElementById('palette');
     const palette = document.createElement('tr');
     table.appendChild(palette);
     const tiles = [];
@@ -116,9 +115,10 @@ function margolus(a, b, c, d, rule) {
     d.update(h);
 }
 
-function makeGrid(w, h, rule) {
+function changeGrid(w, h, rule) {
     parity = 1;
-    const grid = document.createElement('table');
+    grid = document.getElementById('grid');
+    grid.innerHTML = '';
     grid.step = () => {
         const rows = grid.childNodes;
         for (let y = parity; y < h - 1; y += 2) {
@@ -355,9 +355,7 @@ function loadRle(rle) {
     const rule = loadRule(matches[3]);
 
     const pattern = matches[5];
-    if (grid) document.body.removeChild(grid);
-    grid = makeGrid(width, height, rule);
-    document.body.appendChild(grid);
+    changeGrid(width, height, rule);
     loadPattern(grid, pattern);
 }
 

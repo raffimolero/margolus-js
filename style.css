@@ -6,6 +6,10 @@ body, * {
   padding: 0 4px;
 }
 
+div {
+  margin: 8px;
+}
+
 input, textarea, button, .tile {
   border: 1px solid #404040;
 }
