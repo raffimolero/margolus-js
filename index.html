@@ -7,9 +7,14 @@
     <h1>margolus simulatre™</h1>
     <!-- TODO: rule library -->
     <textarea rows="5" cols="50" id='rule' placeholder='Rule table'>@RULE BBM
-symmetries:rotate4
 
+symmetries:none
+1,0,0,0 : 0,0,0,2
+
+symmetries:rotate4
 1,0,0,0 : 0,0,0,1
+2,0,0,0 : 0,0,0,2
+0,1,1,0 : 1,0,0,1
 </textarea>
     <br>
     <button onclick="getAndParseRule()">Load Rule</button>

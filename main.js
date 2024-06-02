@@ -143,7 +143,7 @@ function addRule(ruleName, rule) {
 function parseAndAddRule(ruleText) {
     // TODO: support other margolus neighborhoods
     // like square4cyclic
-    const ruleStructureRegex = /@RULE (\S*)\n+symmetries:\s*(\w*)\n+([\s\S]*)/;
+    const ruleStructureRegex = /@RULE (\S*)\n+([\s\S]*)/;
     const ruleStructure = ruleStructureRegex.exec(ruleText);
 
     if (
@@ -167,61 +167,61 @@ function parseAndAddRule(ruleText) {
         return null;
     }
 
-    const symmetries = ruleStructure[2];
-    let symmetry = [];
-    switch (symmetries) {
-        case 'none':
-            symmetry = [[0, 1, 2, 3]];
-            break;
-        case 'reflect':
-            symmetry = [
-                [0, 1, 2, 3],
-                [1, 0, 3, 2],
-            ];
-            break;
-        case 'rotate4':
-            symmetry = [
-                [0, 1, 2, 3],
-                [1, 3, 0, 2],
-                [3, 2, 1, 0],
-                [2, 0, 3, 1],
-            ];
-            break;
-        case 'rotate4reflect':
-            symmetry = [
-                [0, 1, 2, 3],
-                [1, 3, 0, 2],
-                [3, 2, 1, 0],
-                [2, 0, 3, 1],
-                [1, 0, 3, 2],
-                [3, 1, 2, 0],
-                [2, 3, 0, 1],
-                [0, 2, 1, 3],
-            ];
-            break;
-        case '180':
-            funnyAssert(
-                false,
-                `${symmetries} is not supported at the moment.`,
-                'rotate bad'
-            );
-            break;
-        case 'permute':
-            funnyAssert(
-                false,
-                'Permute symmetry does not make sense for Margolus.',
-                'think about it for a moment. think about permuting a margolus neighborhood.'
-            );
-            break;
-        default:
-            funnyAssert(
-                false,
-                `The rule has an invalid symmetry: ${symmetries}. I only support none, reflect, rotate4, rotate4reflect.`,
-                'sim a tree? whats that'
-            );
+    const symmetryMap = {
+        none: [[0, 1, 2, 3]],
+        reflect: [
+            [0, 1, 2, 3],
+            [1, 0, 3, 2],
+        ],
+        rotate4: [
+            [0, 1, 2, 3],
+            [1, 3, 0, 2],
+            [3, 2, 1, 0],
+            [2, 0, 3, 1],
+        ],
+        rotate4reflect: [
+            [0, 1, 2, 3],
+            [1, 3, 0, 2],
+            [3, 2, 1, 0],
+            [2, 0, 3, 1],
+            [1, 0, 3, 2],
+            [3, 1, 2, 0],
+            [2, 3, 0, 1],
+            [0, 2, 1, 3],
+        ],
+    };
+    function parseSymmetry(symmetries) {
+        const symmetry = symmetryMap[symmetries];
+        if (symmetryMap) {
+            return symmetry;
+        }
+
+        switch (symmetries) {
+            case '180':
+                funnyAssert(
+                    false,
+                    `${symmetries} is not supported at the moment.`,
+                    'rotate bad'
+                );
+                return null;
+            case 'permute':
+                funnyAssert(
+                    false,
+                    'Permute symmetry does not make sense for Margolus.',
+                    'think about it for a moment. think about permuting a margolus neighborhood.'
+                );
+                return null;
+            default:
+                funnyAssert(
+                    false,
+                    `The rule has an invalid symmetry: ${symmetries}. I only support none, reflect, rotate4, rotate4reflect.`,
+                    'sim a tree? whats that'
+                );
+                return null;
+        }
     }
 
-    const contents = ruleStructure[3];
+    const contents = ruleStructure[2];
     // TODO: add variables
 
     function permute(arr, perm) {
@@ -229,12 +229,20 @@ function parseAndAddRule(ruleText) {
     }
 
     // TODO: compile the rule data into something that can be interpreted
+
+    const symmetryRegex = /\s*symmetries\s*:\s*(\w*)\s*(?:#.*)?/;
     const ruleLine =
         /\s*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*:[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(?:\#.*)?/;
+
+    let symmetry = null;
     const ruleEmulator = [];
     for (const line of contents.split('\n')) {
+        const symmetryMatches = symmetryRegex.exec(line);
+        if (symmetryMatches?.index == 0) {
+            symmetry = parseSymmetry(symmetryMatches[1]);
+        }
         const ruleMatches = ruleLine.exec(line);
-        if (ruleMatches) {
+        if (ruleMatches?.index == 0) {
             const [_, a, b, c, d, e, f, g, h] = ruleMatches;
             for (const permutation of symmetry) {
                 const idx = encode(permute([a, b, c, d], permutation));
