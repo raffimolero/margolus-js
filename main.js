@@ -3,13 +3,13 @@ var grid;
 var parity = 1;
 var timerInterval;
 var hold = false;
+document.onmouseup = e => (hold = false);
 var selectedColor = 0;
 var activeBrush = selectedColor;
 
 var colors = [];
 function makePalette() {
-    const table = document.createElement('table');
-    document.body.appendChild(table);
+    const table = document.getElementById('palette');
     const palette = document.createElement('tr');
     table.appendChild(palette);
     const tiles = [];
@@ -65,9 +65,17 @@ function makeTile(x, y, w, h) {
         tile.cellState = state;
         tile.style.backgroundColor = colors[state];
     };
+    const active = '#808080';
+    const inactive = '#404040';
     tile.update = state => {
         if (x == 0 || x == w - 1 || (y == 0) | (y == h - 1)) return;
         tile.set(state);
+    };
+    tile.updateBorders = () => {
+        tile.style.borderTopColor = (y ^ parity) & 1 ? active : inactive;
+        tile.style.borderBottomColor = (y ^ parity) & 1 ? active : inactive;
+        tile.style.borderLeftColor = (x ^ parity) & 1 ? active : inactive;
+        tile.style.borderRightColor = (x ^ parity) & 1 ? active : inactive;
     };
     const mouseSet = e => {
         if (!hold) return;
@@ -79,8 +87,8 @@ function makeTile(x, y, w, h) {
         activeBrush = selectedColor == tile.cellState ? 0 : selectedColor;
         mouseSet(e);
     };
-    tile.onmouseup = e => (hold = false);
     tile.onmouseenter = mouseSet;
+    tile.updateBorders();
     return tile;
 }
 
@@ -107,8 +115,10 @@ function margolus(a, b, c, d, rule) {
     d.update(h);
 }
 
-function makeGrid(w, h, rule) {
-    const grid = document.createElement('table');
+function changeGrid(w, h, rule) {
+    parity = 1;
+    grid = document.getElementById('grid');
+    grid.innerHTML = '';
     grid.step = () => {
         const rows = grid.childNodes;
         for (let y = parity; y < h - 1; y += 2) {
@@ -122,7 +132,14 @@ function makeGrid(w, h, rule) {
                 margolus(a, b, c, d, rule);
             }
         }
-        parity = +!parity;
+        switchParity();
+    };
+    grid.updateBorders = () => {
+        for (const row of grid.childNodes) {
+            for (const tile of row.childNodes) {
+                tile.updateBorders();
+            }
+        }
     };
     grid.onmousedown = e => e.preventDefault();
     for (let y = 0; y < h; y++) {
@@ -190,6 +207,8 @@ function parseAndAddRule(ruleText) {
             [0, 2, 1, 3],
         ],
     };
+
+    const symmetryRegex = /\s*symmetries\s*:\s*(\w*)\s*(?:#.*)?/;
     function parseSymmetry(symmetries) {
         const symmetry = symmetryMap[symmetries];
         if (symmetryMap) {
@@ -230,7 +249,6 @@ function parseAndAddRule(ruleText) {
 
     // TODO: compile the rule data into something that can be interpreted
 
-    const symmetryRegex = /\s*symmetries\s*:\s*(\w*)\s*(?:#.*)?/;
     const ruleLine =
         /\s*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*:[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(?:\#.*)?/;
 
@@ -241,6 +259,7 @@ function parseAndAddRule(ruleText) {
         if (symmetryMatches?.index == 0) {
             symmetry = parseSymmetry(symmetryMatches[1]);
         }
+
         const ruleMatches = ruleLine.exec(line);
         if (ruleMatches?.index == 0) {
             const [_, a, b, c, d, e, f, g, h] = ruleMatches;
@@ -251,6 +270,7 @@ function parseAndAddRule(ruleText) {
             }
             continue;
         }
+
         // TODO: other types of line
     }
     // for (const [idx, out] of ruleEmulator) {
@@ -335,14 +355,17 @@ function loadRle(rle) {
     const rule = loadRule(matches[3]);
 
     const pattern = matches[5];
-    if (grid) document.body.removeChild(grid);
-    grid = makeGrid(width, height, rule);
-    document.body.appendChild(grid);
+    changeGrid(width, height, rule);
     loadPattern(grid, pattern);
 }
 
 function getAndLoadRle() {
     loadRle(document.getElementById('rle').value);
+}
+
+function switchParity() {
+    parity ^= 1;
+    grid.updateBorders();
 }
 
 function step() {
@@ -352,29 +375,43 @@ function step() {
             'load something pls',
             'yes of course lemme just make a step with no feet'
         )
-    )
+    ) {
         grid.step();
+    }
 }
 
-function run() {
+function stepButton() {
+    step();
+    stop();
+}
+
+function stop() {
+    document.getElementById('run').innerHTML = 'Start';
+    clearInterval(timerInterval);
+    timerInterval = null;
+}
+
+function start() {
+    document.getElementById('run').innerHTML = 'Stop';
+    timerInterval = setInterval(step, document.getElementById('delay').value);
+}
+
+function toggleRun() {
     if (
         !funnyAssert(
             grid,
             'load pattern pls',
             'do you really expect me to run with no legs'
         )
-    )
+    ) {
         return;
+    }
+
     if (timerInterval) {
-        document.getElementById('run').innerHTML = 'Start';
-        clearInterval(timerInterval);
-        timerInterval = null;
+        stop();
     } else {
-        document.getElementById('run').innerHTML = 'Stop';
-        timerInterval = setInterval(
-            step,
-            document.getElementById('delay').value
-        );
+        step();
+        start();
     }
 }
 
