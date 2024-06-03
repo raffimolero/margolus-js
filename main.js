@@ -1,5 +1,7 @@
+// TODO list:
+// - rule library dropdown
+
 var grid;
-// TODO: show parity block in table
 var parity = 1;
 var timerInterval;
 var hold = false;
@@ -58,6 +60,8 @@ function funnyAssert(value, error, bonus) {
     return value;
 }
 
+const active = '#808080';
+const inactive = '#404040';
 function makeTile(x, y, w, h) {
     const tile = document.createElement('td');
     tile.className = 'tile';
@@ -65,8 +69,6 @@ function makeTile(x, y, w, h) {
         tile.cellState = state;
         tile.style.backgroundColor = colors[state];
     };
-    const active = '#808080';
-    const inactive = '#404040';
     tile.update = state => {
         if (x == 0 || x == w - 1 || (y == 0) | (y == h - 1)) return;
         tile.set(state);
@@ -279,7 +281,7 @@ function parseAndAddRule(ruleText) {
     //     console.log('---');
     // }
 
-    // TODO: compile all possible transitions using the interpreter
+    // compile all possible transitions using the interpreter
     const table = [];
     for (let i = 0; i < 65536; i++) {
         table.push(i);
@@ -312,7 +314,6 @@ function loadRule(ruleName) {
     return rule;
 }
 
-// TODO: support multistate RLEs
 function loadPattern(grid, pattern) {
     const regex = /(\d*)([\D])/g;
     const rows = grid.childNodes;
@@ -322,25 +323,36 @@ function loadPattern(grid, pattern) {
 
     for (let run = regex.exec(pattern); run; run = regex.exec(pattern)) {
         let length = parseInt(run[1]) || 1;
-        switch (run[2]) {
-            case 'o':
-            case 'A':
-                while (length--) row.childNodes[x++].classList.add('on');
+        const chr = run[2];
+        switch (chr) {
+            case '\n':
+            case ' ':
                 break;
             case '$':
                 x = 1;
                 y += length;
                 row = rows[y];
                 break;
-            default:
+            case '!':
+                return;
+            case 'b':
+            case '.':
                 x += length;
+                break;
+            case 'o':
+                while (length--) row.childNodes[x++].set(1);
+                break;
+            default:
+                const state = chr.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+                while (length--) row.childNodes[x++].set(state);
         }
     }
 }
 
 function loadRle(rle) {
     if (!rle) rle = 'x = 34, y = 21, rule = BBM';
-    const regex = /x = (\d*), y = (\d*), rule = (\S*)\n(.*)/;
+    const regex =
+        /x\s*=\s*(\d*),\s*y\s*=\s*(\d*),\s*rule\s*=\s*(\S*)\n([\s\S]*)/;
     const matches = regex.exec(rle);
     if (
         !funnyAssert(
@@ -354,7 +366,7 @@ function loadRle(rle) {
     const height = parseInt(matches[2]) + 2;
     const rule = loadRule(matches[3]);
 
-    const pattern = matches[5];
+    const pattern = matches[4];
     changeGrid(width, height, rule);
     loadPattern(grid, pattern);
 }
