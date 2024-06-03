@@ -27,11 +27,11 @@ function makePalette() {
         // make tile radio button
         const tile = document.createElement('td');
         palette.appendChild(tile);
-        tile.className = 'tile';
+        tile.className = 'tile palette';
 
         const colorDisplay = document.createElement('div');
         tile.appendChild(colorDisplay);
-        colorDisplay.className = 'tile palette';
+        colorDisplay.className = 'tile color';
         colorDisplay.style.backgroundColor = color;
 
         tiles.push(colorDisplay);
