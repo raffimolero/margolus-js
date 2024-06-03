@@ -7,10 +7,27 @@
     <!-- TODO: rule library -->
 
     <div id="rule-form">
-      <textarea rows="5" cols="50" id="rule" placeholder="Rule table">@RULE BBM
-symmetries:rotate4
-1,0,0,0 : 0,0,0,1
-0,1,1,0 : 1,0,0,1
+      <textarea rows="5" cols="50" id="rule" placeholder="Rule table">@RULE DLA
+symmetries:rotate4reflect
+
+# The Margolus transition a,b,c,d : e,f,g,h means:
+#
+#      a  b   becomes    e  f
+#      c  d              g  h
+
+# 0: vacuum
+# 1: gas particle
+# 2: stuck particle
+
+# random gas-like rules:
+1,0,0,0 : 0,0,0,1 # a diagonally-travelling particle keeps going
+1,1,0,0 : 1,1,0,0 # two particles collide
+0,1,1,0 : 1,0,0,1 # two particles collide head-on
+1,1,1,0 : 1,1,0,1 # three particles pass through each other
+
+# plus aggregation rules: (these seem to suffice)
+1,0,2,0 : 2,0,2,0
+1,0,2,2 : 2,0,2,2
 </textarea>
       <br>
       <button onclick="getAndParseRule()">Load Rule</button>
@@ -18,16 +35,17 @@ symmetries:rotate4
 
 
     <div id="rle-form">
-      <textarea rows="5" cols="50" id="rle" placeholder="Pattern RLE">x = 62, y = 49, rule = BBM
-$62A$62A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A
-28.A29.2A$2A58.2A$2A30.A27.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A
-$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A
-58.2A$2A58.2A$2A58.2A$2A42.A15.2A$2A58.2A$2A40.A17.2A$2A58.2A$2A58.2A
-$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A
-58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$62A$62A!
+      <textarea rows="5" cols="50" id="rle" placeholder="Pattern RLE">x = 36, y = 24, rule = DLA
+6.A6.A8.3A.A4.2A$9.A9.A$2.A3.2A8.A5.A9.2A$5.A.A3.A.A2.A.A2.A4.A$4.2A
+4.A$.2A.A17.A2.A$.A2.A3.A9.A.2A.A.A.A3.A$3.A23.3A.A$3.A8.A5.A6.A.A$9.
+A4.2A4.A.A$A2.2A10.A.A.A15.A$12.2A3.BA.A6.A7.A$6.3A3.A4.A.A13.A$4.A2.
+A7.A2.A.2A10.A.A$A2.A7.A4.A12.2A3.A$8.A7.A6.A3.A6.A$.A9.A7.A6.A.A$16.
+3A.A$.A11.A2.A2.A4.A.A7.A$3.A2.2A3.A18.A$2.A2.A16.A2.A.A$.A8.A8.A8.A$
+18.A$2.A5.A4.A21.A!
 </textarea>
       <br>
       <button onclick="getAndLoadRle()">Load Pattern</button>
+      <button onclick="fillBorder(selectedColor)">Fill Border With Selected Color</button>
     </div>
 
     <div id="simulation">

@@ -73,7 +73,7 @@ function makeTile(x, y, w, h) {
         if (x == 0 || x == w - 1 || (y == 0) | (y == h - 1)) return;
         tile.set(state);
     };
-    tile.updateBorders = () => {
+    tile.updateTableBorders = () => {
         tile.style.borderTopColor = (y ^ parity) & 1 ? active : inactive;
         tile.style.borderBottomColor = (y ^ parity) & 1 ? active : inactive;
         tile.style.borderLeftColor = (x ^ parity) & 1 ? active : inactive;
@@ -90,7 +90,7 @@ function makeTile(x, y, w, h) {
         mouseSet(e);
     };
     tile.onmouseenter = mouseSet;
-    tile.updateBorders();
+    tile.updateTableBorders();
     return tile;
 }
 
@@ -136,10 +136,10 @@ function changeGrid(w, h, rule) {
         }
         switchParity();
     };
-    grid.updateBorders = () => {
+    grid.updateTableBorders = () => {
         for (const row of grid.childNodes) {
             for (const tile of row.childNodes) {
-                tile.updateBorders();
+                tile.updateTableBorders();
             }
         }
     };
@@ -377,7 +377,7 @@ function getAndLoadRle() {
 
 function switchParity() {
     parity ^= 1;
-    grid.updateBorders();
+    grid.updateTableBorders();
 }
 
 function step() {
@@ -427,5 +427,36 @@ function toggleRun() {
     }
 }
 
+function fillBorder(fillColor) {
+    if (
+        !funnyAssert(
+            grid,
+            'load pattern pls',
+            'bruv am i really boutta build the great wall of china but without the china'
+        )
+    ) {
+        return;
+    }
+    const h = grid.childNodes.length;
+    for (const tile of grid.childNodes[0].childNodes) {
+        tile.set(fillColor);
+        tile.updateTableBorders();
+    }
+    for (const tile of grid.childNodes[h - 1].childNodes) {
+        tile.set(fillColor);
+        tile.updateTableBorders();
+    }
+    const w = grid.childNodes[0].childNodes.length;
+    console.log(w);
+    for (const tr of grid.childNodes) {
+        const row = tr.childNodes;
+        row[0].set(fillColor);
+        row[0].updateTableBorders();
+        row[w - 1].set(fillColor);
+        row[w - 1].updateTableBorders();
+    }
+}
+
 getAndParseRule();
 getAndLoadRle();
+fillBorder(3);
