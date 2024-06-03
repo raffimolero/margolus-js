@@ -168,7 +168,7 @@ function parseAndAddRule(ruleText) {
     if (
         !funnyAssert(
             ruleStructure,
-            'The rule is formatted wrong. I am not advanced enough to tell you what is wrong.',
+            'the rule is formatted wrong. i am not advanced enough to tell you what is wrong.',
             'i must be literally illiterate because i cant read this'
         )
     ) {
@@ -179,7 +179,7 @@ function parseAndAddRule(ruleText) {
     if (
         !funnyAssert(
             ruleName,
-            "I couldn't get the rule name for that RLE.",
+            'i cant find the rule in that rle',
             'uh, no rule? anarchy?'
         )
     ) {
@@ -221,24 +221,24 @@ function parseAndAddRule(ruleText) {
             case '180':
                 funnyAssert(
                     false,
-                    `${symmetries} is not supported at the moment.`,
+                    `i dont support ${symmetries} as a symmetry`,
                     'rotate bad'
                 );
-                return null;
+                return [];
             case 'permute':
                 funnyAssert(
                     false,
                     'Permute symmetry does not make sense for Margolus.',
                     'think about it for a moment. think about permuting a margolus neighborhood.'
                 );
-                return null;
+                return [];
             default:
                 funnyAssert(
                     false,
-                    `The rule has an invalid symmetry: ${symmetries}. I only support none, reflect, rotate4, rotate4reflect.`,
+                    `the rule has an invalid symmetry: ${symmetries}. i only support none, reflect, rotate4, rotate4reflect.`,
                     'sim a tree? whats that'
                 );
-                return null;
+                return [];
         }
     }
 
@@ -250,7 +250,6 @@ function parseAndAddRule(ruleText) {
     }
 
     // TODO: compile the rule data into something that can be interpreted
-
     const ruleLine =
         /\s*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*:[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(\w*)[\s,]*(?:\#.*)?/;
 
@@ -308,7 +307,7 @@ function loadRule(ruleName) {
     const rule = rules.get(ruleName);
     funnyAssert(
         rule,
-        "I don't know this rule. Maybe you forgot to Load Rule?",
+        'i dont know this rule, maybe you forgot to load rule',
         'this rule name unreadable frfr, misspelled or forgot to load?'
     );
     return rule;
@@ -364,8 +363,31 @@ function loadRle(rle) {
         return;
     }
 
+    let borderState = 0;
     const comments = matches[1];
-    console.log(comments);
+    let alerted = false;
+    for (let line of comments.split('\n')) {
+        line = line.trim();
+        if (
+            !funnyAssert(
+                alerted || line.startsWith('#') || line === '',
+                'found a bad comment in the rle',
+                'why you gotta comment on me like that'
+            )
+        ) {
+            alerted = true;
+            continue;
+        }
+        if (!line.startsWith('#MARGOLUS ')) {
+            continue;
+        }
+        const matches = /#MARGOLUS (?:Border=(\d+))?/.exec(line);
+        const [_, border] = matches;
+        if (border) {
+            borderState = border;
+        }
+        break;
+    }
 
     const width = parseInt(matches[2]) + 2;
     const height = parseInt(matches[3]) + 2;
@@ -374,6 +396,7 @@ function loadRle(rle) {
     const pattern = matches[5];
     changeGrid(width, height, rule);
     loadPattern(grid, pattern);
+    fillBorder(borderState);
 }
 
 function getAndLoadRle() {
@@ -463,4 +486,3 @@ function fillBorder(fillColor) {
 
 getAndParseRule();
 getAndLoadRle();
-fillBorder(3);
