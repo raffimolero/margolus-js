@@ -6,6 +6,30 @@
   <body>
     <!-- TODO: rule library -->
 
+    <div id="rule-form">
+      <textarea rows="5" cols="50" id="rule" placeholder="Rule table">@RULE BBM
+symmetries:rotate4
+1,0,0,0 : 0,0,0,1
+0,1,1,0 : 1,0,0,1
+</textarea>
+      <br>
+      <button onclick="getAndParseRule()">Load Rule</button>
+    </div>
+
+
+    <div id="rle-form">
+      <textarea rows="5" cols="50" id="rle" placeholder="Pattern RLE">x = 62, y = 49, rule = BBM
+$62A$62A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A
+28.A29.2A$2A58.2A$2A30.A27.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A
+$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A
+58.2A$2A58.2A$2A58.2A$2A42.A15.2A$2A58.2A$2A40.A17.2A$2A58.2A$2A58.2A
+$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$2A
+58.2A$2A58.2A$2A58.2A$2A58.2A$2A58.2A$62A$62A!
+</textarea>
+      <br>
+      <button onclick="getAndLoadRle()">Load Pattern</button>
+    </div>
+
     <div id="simulation">
       <h1>margolus simulatre™</h1>
 
@@ -18,24 +42,6 @@
       <table id="palette"></table>
       <table id="grid"></table>
     </div>
-
-    <div id="rle-form">
-      <button onclick="getAndLoadRle()">Load Pattern</button>
-      <br>
-      <textarea rows="5" cols="50" id="rle" placeholder="Pattern RLE">x = 36, y = 24, rule = BBM
-4$4.2A$6.A$5.2A$6.2A2$5.A.A$5.A.2A$6.3A$7.2A3$20.3A$20.A.A$22.2A$23.A!</textarea>
-    </div>
-
-    <div id="rule-form">
-      <button onclick="getAndParseRule()">Load Rule</button>
-      <br>
-      <textarea rows="5" cols="50" id="rule" placeholder="Rule table">@RULE BBM
-symmetries:rotate4
-1,0,0,0 : 0,0,0,1
-0,1,1,0 : 1,0,0,1
-</textarea>
-    </div>
-
     <script src="main.js"></script>
   </body>
 </html>

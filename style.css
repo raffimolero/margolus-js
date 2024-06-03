@@ -57,7 +57,7 @@ button:hover {
   background-color: black;
 }
 
-.tile.palette {
+.tile.palette .color {
   width: 24px;
   height: 24px;
   margin: 6px;
@@ -65,20 +65,22 @@ button:hover {
 }
 .tile.palette:hover {
   cursor: pointer;
+}
+.tile.palette:hover .color {
   width: 28px;
   height: 28px;
   margin: 4px;
 }
-.tile.palette:active {
+.tile.palette:active .color {
   width: 24px;
   height: 24px;
   margin: 6px;
 }
-.tile.palette.selected:not(:hover) {
+.tile.palette:not(:hover) .color.selected {
   width: 30px;
   height: 30px;
   margin: 3px;
 }
-.tile.palette.selected {
+.tile.color.selected {
   border: 2px solid white;
 }
