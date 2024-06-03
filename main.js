@@ -352,7 +352,7 @@ function loadPattern(grid, pattern) {
 function loadRle(rle) {
     if (!rle) rle = 'x = 34, y = 21, rule = BBM';
     const regex =
-        /x\s*=\s*(\d*),\s*y\s*=\s*(\d*),\s*rule\s*=\s*(\S*)\n([\s\S]*)/;
+        /([\s\S]*?)x\s*=\s*(\d*),\s*y\s*=\s*(\d*),\s*rule\s*=\s*(\S*)\n([\s\S]*)/;
     const matches = regex.exec(rle);
     if (
         !funnyAssert(
@@ -360,13 +360,18 @@ function loadRle(rle) {
             'rle header broke',
             'is your spelling bad or do you not know what an rle is'
         )
-    )
+    ) {
         return;
-    const width = parseInt(matches[1]) + 2;
-    const height = parseInt(matches[2]) + 2;
-    const rule = loadRule(matches[3]);
+    }
 
-    const pattern = matches[4];
+    const comments = matches[1];
+    console.log(comments);
+
+    const width = parseInt(matches[2]) + 2;
+    const height = parseInt(matches[3]) + 2;
+    const rule = loadRule(matches[4]);
+
+    const pattern = matches[5];
     changeGrid(width, height, rule);
     loadPattern(grid, pattern);
 }
@@ -447,7 +452,6 @@ function fillBorder(fillColor) {
         tile.updateTableBorders();
     }
     const w = grid.childNodes[0].childNodes.length;
-    console.log(w);
     for (const tr of grid.childNodes) {
         const row = tr.childNodes;
         row[0].set(fillColor);
