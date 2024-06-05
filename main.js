@@ -1,7 +1,9 @@
 // TODO list:
 // - rule library dropdown
 
+//
 // ===== UTIL =====
+//
 
 // self documenting
 function funnyAssert(assertion, errorMessage, bonusMessage) {
@@ -12,7 +14,9 @@ function funnyAssert(assertion, errorMessage, bonusMessage) {
     return assertion;
 }
 
+//
 // ===== GLOBALS =====
+//
 
 // the table element that displays the grid
 var grid;
@@ -45,7 +49,39 @@ var selectedColor = 0;
 // the actual state to draw with, which may be different from the selected color
 var activeBrush = selectedColor;
 
+//
+// ===== SIMULATION =====
+//
+
+// encode an array of 4 states from 0-16 into one 32-bit integer
+function encode(arr) {
+    return (arr[0] << 0) | (arr[1] << 4) | (arr[2] << 8) | (arr[3] << 12);
+}
+
+// decode one 32-bit integer into an array of 4 states from 0-16
+function decode(num) {
+    return [
+        (num >> 0) & 0b1111,
+        (num >> 4) & 0b1111,
+        (num >> 8) & 0b1111,
+        (num >> 12) & 0b1111,
+    ];
+}
+
+// apply a margolus rule to 4 tile DOM elements
+function margolus(a, b, c, d, rule) {
+    const output =
+        rule[encode([a.cellState, b.cellState, c.cellState, d.cellState])];
+    const [e, f, g, h] = decode(output);
+    a.update(e);
+    b.update(f);
+    c.update(g);
+    d.update(h);
+}
+
+//
 // ===== DOM =====
+//
 
 // whether the simulation is running
 // null means paused, otherwise is an id created by setInterval and can be used in clearInterval
@@ -134,32 +170,6 @@ function makeTile(x, y, w, h) {
     return tile;
 }
 
-// encode an array of 4 states from 0-16 into one 32-bit integer
-function encode(arr) {
-    return (arr[0] << 0) | (arr[1] << 4) | (arr[2] << 8) | (arr[3] << 12);
-}
-
-// decode one 32-bit integer into an array of 4 states from 0-16
-function decode(num) {
-    return [
-        (num >> 0) & 0b1111,
-        (num >> 4) & 0b1111,
-        (num >> 8) & 0b1111,
-        (num >> 12) & 0b1111,
-    ];
-}
-
-// apply a margolus rule to 4 tile DOM elements
-function margolus(a, b, c, d, rule) {
-    const output =
-        rule[encode([a.cellState, b.cellState, c.cellState, d.cellState])];
-    const [e, f, g, h] = decode(output);
-    a.update(e);
-    b.update(f);
-    c.update(g);
-    d.update(h);
-}
-
 // clear and resize the existing grid
 function resizeGrid(w, h) {
     width = w;
@@ -198,6 +208,10 @@ function resizeGrid(w, h) {
         }
     }
 }
+
+//
+// ===== RULE TABLE =====
+//
 
 // takes in a source rule table, and tries to
 // parse and add it to the global rule library
@@ -335,13 +349,6 @@ function parseAndAddRule(ruleText) {
     return ruleName;
 }
 
-// called by a button
-// parses and loads the contents of the rule text box
-function getAndParseRule() {
-    const rule = parseAndAddRule(document.getElementById('rule').value);
-    loadRule(rule);
-}
-
 // attempts to load a rule by name
 // alerts user but otherwise does nothing on failure
 function loadRule(ruleName) {
@@ -356,6 +363,10 @@ function loadRule(ruleName) {
         rule = newRule;
     }
 }
+
+//
+// ===== RLE =====
+//
 
 // takes the raw RLE payload without the header and loads it into the grid
 // if borderless is false, adds a border of static state 0 around the RLE
@@ -446,53 +457,9 @@ function loadRle(rle) {
     loadPattern(pattern, borderless);
 }
 
-// called by a button
-// takes the contents of the rle text box and loads it
-function getAndLoadRle() {
-    loadRle(document.getElementById('rle').value);
-}
-
-// sometimes called by a button
-// changes the parity of the margolus grid
-function switchParity() {
-    parity ^= 1;
-    grid.updateTableBorders();
-}
-
-// steps the simulation once
-function step() {
-    grid.step();
-}
-
-// called by a button
-// steps the simulation, but also pauses it
-function manualStep() {
-    step();
-    stop();
-}
-
-// pauses the simulation
-function stop() {
-    if (!timerInterval) return;
-    document.getElementById('run').innerHTML = 'Start';
-    clearInterval(timerInterval);
-    timerInterval = null;
-}
-
-// starts running the simulation at the speed set by the 'delay' html element
-function start() {
-    if (timerInterval) return;
-    document.getElementById('run').innerHTML = 'Stop';
-    timerInterval = setInterval(step, document.getElementById('delay').value);
-    step();
-}
-
-// called by a button
-// starts/stops the simulation
-function toggleRun() {
-    if (timerInterval) stop();
-    else start();
-}
+//
+// ===== BUTTONS =====
+//
 
 // sometimes called by a button
 // sets all the cells of the grid's border to the specified color
@@ -525,7 +492,64 @@ function fillBorder(fillColor) {
     }
 }
 
+// sometimes called by a button
+// changes the parity of the margolus grid
+function switchParity() {
+    parity ^= 1;
+    grid.updateTableBorders();
+}
+
+// steps the simulation once
+function step() {
+    grid.step();
+}
+
+// starts running the simulation at the speed set by the 'delay' html element
+function start() {
+    if (timerInterval) return;
+    document.getElementById('run').innerHTML = 'Stop';
+    timerInterval = setInterval(step, document.getElementById('delay').value);
+    step();
+}
+
+// pauses the simulation
+function stop() {
+    if (!timerInterval) return;
+    document.getElementById('run').innerHTML = 'Start';
+    clearInterval(timerInterval);
+    timerInterval = null;
+}
+
+// called by a button
+// parses and loads the contents of the rule text box
+function getAndParseRule() {
+    const rule = parseAndAddRule(document.getElementById('rule').value);
+    loadRule(rule);
+}
+
+// called by a button
+// takes the contents of the rle text box and loads it
+function getAndLoadRle() {
+    loadRle(document.getElementById('rle').value);
+}
+
+// called by a button
+// steps the simulation, but also pauses it
+function manualStep() {
+    step();
+    stop();
+}
+
+// called by a button
+// starts/stops the simulation
+function toggleRun() {
+    if (timerInterval) stop();
+    else start();
+}
+
+//
 // ===== INIT/MAIN =====
+//
 
 getAndParseRule();
 getAndLoadRle();
