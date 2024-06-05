@@ -313,27 +313,27 @@ function loadRule(ruleName) {
     return rule;
 }
 
-function loadPattern(grid, pattern) {
+function loadPattern(grid, pattern, borderless) {
+    const baseIdx = borderless ? 0 : 1;
     const regex = /(\d*)([\D])/g;
     const rows = grid.childNodes;
-    let x = 1;
-    let y = 1;
+    let x = baseIdx;
+    let y = baseIdx;
     let row = rows[y];
 
     for (let run = regex.exec(pattern); run; run = regex.exec(pattern)) {
         let length = parseInt(run[1]) || 1;
         const chr = run[2];
+        if (chr === '!') break;
         switch (chr) {
             case '\n':
             case ' ':
                 break;
             case '$':
-                x = 1;
+                x = baseIdx;
                 y += length;
                 row = rows[y];
                 break;
-            case '!':
-                return;
             case 'b':
             case '.':
                 x += length;
@@ -363,7 +363,7 @@ function loadRle(rle) {
         return;
     }
 
-    let borderState = 0;
+    let borderless = false;
     const comments = matches[1];
     let alerted = false;
     for (let line of comments.split('\n')) {
@@ -381,22 +381,19 @@ function loadRle(rle) {
         if (!line.startsWith('#MARGOLUS ')) {
             continue;
         }
-        const matches = /#MARGOLUS (?:Border=(\d+))?/.exec(line);
-        const [_, border] = matches;
-        if (border) {
-            borderState = border;
-        }
+        const matches = /#MARGOLUS (static-border)?/.exec(line);
+        const [_, borderlessOpt] = matches;
+        borderless |= borderlessOpt !== undefined;
         break;
     }
 
-    const width = parseInt(matches[2]) + 2;
-    const height = parseInt(matches[3]) + 2;
+    const width = parseInt(matches[2]) + (borderless ? 0 : 2);
+    const height = parseInt(matches[3]) + (borderless ? 0 : 2);
     const rule = loadRule(matches[4]);
 
     const pattern = matches[5];
     changeGrid(width, height, rule);
-    loadPattern(grid, pattern);
-    fillBorder(borderState);
+    loadPattern(grid, pattern, borderless);
 }
 
 function getAndLoadRle() {
