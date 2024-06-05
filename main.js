@@ -358,7 +358,10 @@ function loadRule(ruleName) {
     }
 }
 
-function loadPattern(grid, pattern, borderless) {
+// takes the raw RLE payload without the header and loads it into the grid
+// if borderless is false, adds a border of static state 0 around the RLE
+// if borderless is true, uses the RLE's edges as the static border
+function loadPattern(rlePayload, borderless) {
     const baseIdx = borderless ? 0 : 1;
     const regex = /(\d*)([\D])/g;
     const rows = grid.childNodes;
@@ -366,7 +369,7 @@ function loadPattern(grid, pattern, borderless) {
     let y = baseIdx;
     let row = rows[y];
 
-    for (let run = regex.exec(pattern); run; run = regex.exec(pattern)) {
+    for (let run = regex.exec(rlePayload); run; run = regex.exec(rlePayload)) {
         let length = parseInt(run[1]) || 1;
         const chr = run[2];
         if (chr === '!') break;
@@ -393,6 +396,9 @@ function loadPattern(grid, pattern, borderless) {
     }
 }
 
+// loads a given RLE into the grid, with a border of static state 0 around it
+// adding '#MARGOLUS' gives extra options:
+// - 'borderless' uses the RLE's edges as the static border instead of adding state 0
 function loadRle(rle) {
     if (!rle) rle = 'x = 34, y = 21, rule = BBM';
     const regex =
@@ -438,7 +444,7 @@ function loadRle(rle) {
     const pattern = matches[5];
 
     resizeGrid(w, h);
-    loadPattern(grid, pattern, borderless);
+    loadPattern(pattern, borderless);
 }
 
 function getAndLoadRle() {
