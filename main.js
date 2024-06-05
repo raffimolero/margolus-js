@@ -1,15 +1,61 @@
 // TODO list:
 // - rule library dropdown
 
+// ===== UTIL =====
+
+// self documenting
+function funnyAssert(assertion, errorMessage, bonusMessage) {
+    if (!assertion) {
+        if (Math.random() < 0.25) alert(bonusMessage);
+        else alert(errorMessage);
+    }
+    return assertion;
+}
+
+// ===== GLOBALS =====
+
+// the table element that displays the grid
 var grid;
+// width of grid
+var width;
+// height of grid
+var height;
+// active rule
+var rule;
+
+// the rules that have been loaded
+const rules = new Map();
+function addRule(ruleName, rule) {
+    rules.set(ruleName, rule);
+}
+
+// the current margolus parity
 var parity = 1;
-var timerInterval;
-var hold = false;
-document.onmouseup = e => (hold = false);
+
+// margolus grid colors
+const activeBorderColor = '#808080';
+const inactiveBorderColor = '#404040';
+
+// the hex codes for each state color as strings
+var colors = [];
+
+// the current selected color in the palette
 var selectedColor = 0;
+
+// the actual state to draw with, which may be different from the selected color
 var activeBrush = selectedColor;
 
-var colors = [];
+// ===== DOM =====
+
+// whether the simulation is running
+// null means paused, otherwise is an id created by setInterval and can be used in clearInterval
+var timerInterval = null;
+
+// whether any mouse button is currently held
+var mouseHeld = false;
+document.onmouseup = e => (mouseHeld = false);
+
+// hydrate the palette element in the html
 function makePalette() {
     const table = document.getElementById('palette');
     const palette = document.createElement('tr');
@@ -24,7 +70,7 @@ function makePalette() {
         const color = `#${r}${g}${b}`;
         colors.push(color);
 
-        // make tile radio button
+        // make tile 'radio button'
         const tile = document.createElement('td');
         palette.appendChild(tile);
         tile.className = 'tile palette';
@@ -52,16 +98,7 @@ function makePalette() {
 }
 makePalette();
 
-function funnyAssert(value, error, bonus) {
-    if (!value) {
-        if (Math.random() < 0.25) alert(bonus);
-        else alert(error);
-    }
-    return value;
-}
-
-const active = '#808080';
-const inactive = '#404040';
+// create a single clickable tile
 function makeTile(x, y, w, h) {
     const tile = document.createElement('td');
     tile.className = 'tile';
@@ -74,30 +111,35 @@ function makeTile(x, y, w, h) {
         tile.set(state);
     };
     tile.updateTableBorders = () => {
-        tile.style.borderTopColor = (y ^ parity) & 1 ? active : inactive;
-        tile.style.borderBottomColor = (y ^ parity) & 1 ? active : inactive;
-        tile.style.borderLeftColor = (x ^ parity) & 1 ? active : inactive;
-        tile.style.borderRightColor = (x ^ parity) & 1 ? active : inactive;
+        tile.style.borderTopColor =
+            (y ^ parity) & 1 ? activeBorderColor : inactiveBorderColor;
+        tile.style.borderBottomColor =
+            (y ^ parity) & 1 ? activeBorderColor : inactiveBorderColor;
+        tile.style.borderLeftColor =
+            (x ^ parity) & 1 ? activeBorderColor : inactiveBorderColor;
+        tile.style.borderRightColor =
+            (x ^ parity) & 1 ? activeBorderColor : inactiveBorderColor;
     };
-    const mouseSet = e => {
-        if (!hold) return;
-        // console.log(x, y);
+    const mouseDraw = e => {
+        if (!mouseHeld) return;
         tile.set(activeBrush);
     };
     tile.onmousedown = e => {
-        hold = true;
+        mouseHeld = true;
         activeBrush = selectedColor == tile.cellState ? 0 : selectedColor;
-        mouseSet(e);
+        mouseDraw(e);
     };
-    tile.onmouseenter = mouseSet;
+    tile.onmouseenter = mouseDraw;
     tile.updateTableBorders();
     return tile;
 }
 
+// encode an array of 4 states from 0-16 into one 32-bit integer
 function encode(arr) {
     return (arr[0] << 0) | (arr[1] << 4) | (arr[2] << 8) | (arr[3] << 12);
 }
 
+// decode one 32-bit integer into an array of 4 states from 0-16
 function decode(num) {
     return [
         (num >> 0) & 0b1111,
@@ -107,6 +149,7 @@ function decode(num) {
     ];
 }
 
+// apply a margolus rule to 4 tile DOM elements
 function margolus(a, b, c, d, rule) {
     const output =
         rule[encode([a.cellState, b.cellState, c.cellState, d.cellState])];
@@ -117,7 +160,10 @@ function margolus(a, b, c, d, rule) {
     d.update(h);
 }
 
-function changeGrid(w, h, rule) {
+// clear and resize the existing grid
+function resizeGrid(w, h) {
+    width = w;
+    height = h;
     parity = 1;
     grid = document.getElementById('grid');
     grid.innerHTML = '';
@@ -154,11 +200,9 @@ function changeGrid(w, h, rule) {
     return grid;
 }
 
-const rules = new Map();
-function addRule(ruleName, rule) {
-    rules.set(ruleName, rule);
-}
-
+// takes in a source rule table, and tries to
+// parse and add it to the global rule library
+// returns the rule name on success, null on failure
 function parseAndAddRule(ruleText) {
     // TODO: support other margolus neighborhoods
     // like square4cyclic
@@ -274,11 +318,6 @@ function parseAndAddRule(ruleText) {
 
         // TODO: other types of line
     }
-    // for (const [idx, out] of ruleEmulator) {
-    //     console.log(decode(idx));
-    //     console.log(decode(out));
-    //     console.log('---');
-    // }
 
     // compile all possible transitions using the interpreter
     const table = [];
@@ -293,24 +332,30 @@ function parseAndAddRule(ruleText) {
             }
         }
     }
-    // console.log(table);
     addRule(ruleName, table);
     return ruleName;
 }
 
+// called by a button
+// parses and loads the rule in the rule text box
 function getAndParseRule() {
     const rule = parseAndAddRule(document.getElementById('rule').value);
     loadRule(rule);
 }
 
+// attempts to load a rule by name
+// alerts user but otherwise does nothing on failure
 function loadRule(ruleName) {
-    const rule = rules.get(ruleName);
-    funnyAssert(
-        rule,
-        'i dont know this rule, maybe you forgot to load rule',
-        'this rule name unreadable frfr, misspelled or forgot to load?'
-    );
-    return rule;
+    const newRule = rules.get(ruleName);
+    if (
+        funnyAssert(
+            newRule,
+            'i dont know this rule, maybe you forgot to load rule',
+            'this rule name unreadable frfr, misspelled or forgot to load?'
+        )
+    ) {
+        rule = newRule;
+    }
 }
 
 function loadPattern(grid, pattern, borderless) {
@@ -387,12 +432,12 @@ function loadRle(rle) {
         break;
     }
 
-    const width = parseInt(matches[2]) + (borderless ? 0 : 2);
-    const height = parseInt(matches[3]) + (borderless ? 0 : 2);
-    const rule = loadRule(matches[4]);
-
+    const w = parseInt(matches[2]) + (borderless ? 0 : 2);
+    const h = parseInt(matches[3]) + (borderless ? 0 : 2);
+    loadRule(matches[4]);
     const pattern = matches[5];
-    changeGrid(width, height, rule);
+
+    resizeGrid(w, h);
     loadPattern(grid, pattern, borderless);
 }
 
@@ -462,22 +507,20 @@ function fillBorder(fillColor) {
     ) {
         return;
     }
-    const h = grid.childNodes.length;
     for (const tile of grid.childNodes[0].childNodes) {
         tile.set(fillColor);
         tile.updateTableBorders();
     }
-    for (const tile of grid.childNodes[h - 1].childNodes) {
+    for (const tile of grid.childNodes[height - 1].childNodes) {
         tile.set(fillColor);
         tile.updateTableBorders();
     }
-    const w = grid.childNodes[0].childNodes.length;
     for (const tr of grid.childNodes) {
         const row = tr.childNodes;
         row[0].set(fillColor);
         row[0].updateTableBorders();
-        row[w - 1].set(fillColor);
-        row[w - 1].updateTableBorders();
+        row[width - 1].set(fillColor);
+        row[width - 1].updateTableBorders();
     }
 }
 
