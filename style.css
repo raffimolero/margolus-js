@@ -14,6 +14,10 @@ input, textarea, button, .tile {
   border: 1px solid #404040;
 }
 
+textarea {
+  font-family: monospace;
+}
+
 button {
   padding: 0.5em 1em;
   background-color: #606060;
