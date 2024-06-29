@@ -1,4 +1,5 @@
 const test = `
+
 # la;sdfjk;
 #
 
@@ -13,7 +14,11 @@ const test = `
     # varname alone inside the set is invalid, must be & or *
     # &varname ties a variable
     # *varname expands its contents
-   var a =  { ,0 , 1 , 2, 3 }
+   var a =  { ,0 ,,
+    , 1
+   156 
+
+    , 2, 3, }
 var b   =   a
 
    
@@ -48,10 +53,8 @@ var = 'var' + ws + name + ws? + '=' + ws? + '{' + delim* + item(delim)* + delim*
 function pront(thing, note = null) {
     let p = document.createElement('p');
     document.body.appendChild(p);
-    if (note !== null) {
-        note = `[Note: ${note}] `;
-    }
-    p.innerText = `${note}[${typeof thing}] ${thing}`;
+    const attached_note = note ? `[Note: ${note}] ` : '';
+    p.innerText = `${attached_note}[${typeof thing}] ${thing}`;
 }
 
 pront('RUNNING RULE2.JS');
@@ -66,9 +69,15 @@ class Lexer {
     text;
     index = 0;
     current_token = null;
+    // ORDER IS NOT GUARANTEED.
     regexes = {
-        ws: /\s+/,
-        num: /\d+/,
+        ws: /[\t\f\cK ]+/g,
+        num: /\d+/g,
+        ident: /[-_a-zA-Z][-_\w]*/g,
+        header: /@[A-Z]+/g,
+        newline: /\r?\n/g,
+        comment: /#.*/g,
+        special: /[:;,{}\[\]=]/g,
     };
 
     constructor(text) {
@@ -99,9 +108,6 @@ class Lexer {
         for (const [kind, regex] of Object.entries(this.regexes)) {
             const match = this.hack_regex(regex);
             if (match !== null) {
-                pront(this.index, 'index');
-                pront(kind, 'kind');
-                pront(match, 'match');
                 return { kind, value: match };
             }
         }
@@ -122,17 +128,15 @@ class Lexer {
     }
 }
 
-let lex = new Lexer('test');
-for (let i = 0; i < 100; i++) {
+let lex = new Lexer(test);
+for (let i = 0; i < 1000; i++) {
     const next = lex.next();
     if (next === null) {
         pront('stopped');
         break;
     }
-    pront(next.kind, 'kind');
-    pront(next.value, 'val');
+    pront([next.kind, '"' + next.value + '"'], 'kind value');
 }
-
 // function tokenize(rule) {
 //     const tokens = [];
 //     for (let i = 0; i < rule.length; i++) {
