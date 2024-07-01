@@ -29,7 +29,18 @@ a, c, d, e : r, 31, gh, el
    
 `;
 
-test = '@RULE 3333333';
+test = `#
+
+#[asdfl;j]
+#wha
+# negus
+@RULE 3333333
+
+
+
+
+
+`;
 
 const _ = `
 
@@ -90,7 +101,7 @@ class Lexer {
     index = 0;
     line = 1;
     col = 1;
-    lines = [];
+    line_starts = [0];
     current_token = null;
     // ordered by how likely i think they would appear.
     // only exceptions are special-cased identifiers.
@@ -116,7 +127,7 @@ class Lexer {
     // -1 is no context, just the message.
     // 0 prints a line and column number.
     // >=1 prints that many lines from the rule text for the error.
-    raise_err_here(message, context = 1) {
+    raise_err_here(message, context = 3) {
         const token_length = this.current_token?.value?.length || 1;
         const col = this.col - token_length;
 
@@ -132,11 +143,13 @@ class Lexer {
             error_msg += `, found ${item}.`;
         }
         if (context > 0) {
-            const first_line_pos = this.lines[Math.max(0, this.line - context)];
-            error_msg += '\n';
-            error_msg += this.text.slice(first_line_pos);
-            error_msg += '\n';
-            error_msg += ' '.repeat(col - 1) + '^'.repeat(token_length);
+            const first_line_pos =
+                this.line_starts[Math.max(0, this.line - context)];
+            const context_lines = this.text.slice(first_line_pos, this.index);
+            const highlight_arrows =
+                ' '.repeat(col - 1) + '^'.repeat(token_length);
+            error_msg += `\n${context_lines}\n${highlight_arrows}`;
+            // TODO: print after
         }
         error_msg += '\n';
         this.raise_err(error_msg);
@@ -167,7 +180,7 @@ class Lexer {
             };
             // handle line/column
             if (kind === 'nl') {
-                this.lines.push(this.index - match[0].length);
+                this.line_starts.push(this.index);
                 this.line++;
                 this.col = 1;
             } else {
@@ -218,7 +231,10 @@ function parse_rule_name(lexer) {
 
     let next = lexer.peek_after(WS_NL);
     if (next === null) {
-        lexer.raise_err_here('This rule is empty.', -1);
+        lexer.raise_err_here(
+            'This rule is empty. Did you comment out the @RULE declaration?',
+            -1
+        );
         return UNNAMED;
     }
     if (next.kind !== 'header' || next.value !== '@RULE') {
