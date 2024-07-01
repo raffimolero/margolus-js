@@ -14,12 +14,15 @@ const test = `
     # varname alone inside the set is invalid, must be & or *
     # &varname ties a variable
     # *varname expands its contents
-   var a =  { ,0 ,,
+   var a, b, c =  { ,0 ,,
     , 1
-   156 
+   156245 
 
     , 2, 3, }
 var b   =   a
+    var x, y, z = {2, 4, 6, 8}
+
+a, c, d, e : r, 31, gh, el 
 
    
 `;
@@ -68,17 +71,27 @@ pront('RUNNING RULE2.JS');
 class Lexer {
     text;
     index = 0;
+    line = 1;
+    col = 1;
     current_token = null;
-    // ORDER IS NOT GUARANTEED.
-    regexes = {
-        ws: /[\t\f\cK ]+/g,
-        num: /\d+/g,
-        ident: /[-_a-zA-Z][-_\w]*/g,
-        header: /@[A-Z]+/g,
-        newline: /\r?\n/g,
-        comment: /#.*/g,
-        special: /[:;,{}\[\]=]/g,
-    };
+    // ordered by how likely i think they would appear.
+    // only exceptions are special-cased identifiers.
+    // neighborhoods like margolus|square4cyclic, and symmetries like
+    regexes = [
+        ['whitespace', /[\t\f\cK ]+/y],
+        ['num', /\d+/y],
+        ['kw', /var|n_states|neighborhood|symmetries/y],
+        ['neighborhood', /margolus|square4cyclic/y],
+        ['symmetry', /(none)|rot([24])(ref)?|([xy])ref|(diag)/y], // use the capture group to figure out which one
+        ['ident', /[-_a-zA-Z][-_\w]*/y],
+        // comma, colon, equal, and braces are for syntax
+        // %^&* are indexing characters and were agreed on during this conversation:
+        // https://discord.com/channels/357922255553953794/437055638376284161/1256579184793223198
+        ['punctuation', /[,:={}%^&*]/y],
+        ['newline', /\r?\n/y],
+        ['header', /@[A-Z]+/y],
+        ['comment', /#.*/y],
+    ];
 
     constructor(text) {
         pront(text);
@@ -87,29 +100,35 @@ class Lexer {
 
     // lexes a whole token based on a regex.
     // returns a string representing the regex match, or null if the string does not start with a match.
-    hack_regex(regex) {
+    try_regex(regex) {
         regex.lastIndex = this.index;
         const match = regex.exec(this.text);
-        const started_with =
-            match !== null && this.index === regex.lastIndex - match[0].length;
-        if (!started_with) {
-            return null;
+        if (match !== null) {
+            this.index = regex.lastIndex;
         }
-        this.index = regex.lastIndex;
-        return match[0];
-    }
-
-    skip_whitespace() {
-        this.hack_regex(this.regexes.ws);
+        return match;
     }
 
     read_token() {
-        this.skip_whitespace();
-        for (const [kind, regex] of Object.entries(this.regexes)) {
-            const match = this.hack_regex(regex);
-            if (match !== null) {
-                return { kind, value: match };
+        for (const [kind, regex] of this.regexes) {
+            const match = this.try_regex(regex);
+            if (match === null) {
+                continue;
             }
+            const out = {
+                kind,
+                value: match[0],
+                line: this.line,
+                col: this.col,
+            };
+            // handle line/column
+            if (kind === 'newline') {
+                this.line++;
+                this.col = 1;
+            } else {
+                this.col += match[0].length;
+            }
+            return out;
         }
         return null;
     }
@@ -135,24 +154,15 @@ for (let i = 0; i < 1000; i++) {
         pront('stopped');
         break;
     }
-    pront([next.kind, '"' + next.value + '"'], 'kind value');
+    pront(
+        `<${next.kind}> "${next.value}" @line ${next.line}, col ${next.col}`,
+        'kind value'
+    );
 }
-// function tokenize(rule) {
-//     const tokens = [];
-//     for (let i = 0; i < rule.length; i++) {
-//         if (tokens[i].) {
 
-//         }
-//     }
-// }
-
-// function parse(rule) {
-//     const whitespace = /[\n\r\s]+/;
-//     for (const line of rule.split(whitespace)) {
-//         /regex/.test(line);
-//         if (line.contains()) console.log(line.trim());
-//     }
-// }
+class Parser {
+    // TODO
+}
 
 // function test1() {
 //     parse(test);
