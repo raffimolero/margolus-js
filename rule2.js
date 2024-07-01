@@ -1,7 +1,9 @@
-const test = `
+let test = `
 
 # la;sdfjk;
 #
+
+;asdf;lj
 
 @RULE things
 
@@ -70,6 +72,19 @@ pront('RUNNING RULE2.JS');
 // newline
 class Lexer {
     text;
+    raise_err;
+    constructor(text, raise_err) {
+        if (!text) {
+            console.log('WARNING: This lexer does not have any text.');
+        }
+        if (!raise_err) {
+            console.log('WARNING: You have created a silent lexer.');
+        }
+        pront(text);
+        this.text = text;
+        this.raise_err = raise_err;
+    }
+
     index = 0;
     line = 1;
     col = 1;
@@ -78,7 +93,7 @@ class Lexer {
     // only exceptions are special-cased identifiers.
     // neighborhoods like margolus|square4cyclic, and symmetries like
     regexes = [
-        ['whitespace', /[\t\f\cK ]+/y],
+        ['ws', /[\t\f\cK ]+/y],
         ['num', /\d+/y],
         ['kw', /var|n_states|neighborhood|symmetries/y],
         ['neighborhood', /margolus|square4cyclic/y],
@@ -87,15 +102,28 @@ class Lexer {
         // comma, colon, equal, and braces are for syntax
         // %^&* are indexing characters and were agreed on during this conversation:
         // https://discord.com/channels/357922255553953794/437055638376284161/1256579184793223198
-        ['punctuation', /[,:={}%^&*]/y],
-        ['newline', /\r?\n/y],
-        ['header', /@[A-Z]+/y],
+        ['punct', /[,:={}%^&*]/y],
+        ['nl', /\r?\n/y],
         ['comment', /#.*/y],
+        ['header', /@[A-Z]+/y],
+        ['unknown', /[\w\W]/y],
     ];
 
-    constructor(text) {
-        pront(text);
-        this.text = text;
+    // `context` determines how verbose the error is.
+    // -1 is no context, just the message.
+    // 0 prints a line and column number.
+    // >=1 prints that many lines from the rule text for the error.
+    raise_err_here(message, context = 0) {
+        let error_msg = message;
+        if (context >= 0) {
+            error_msg += ` at line ${this.line}, from column ${this.col}`;
+        }
+        if (context > 0) {
+            error_msg +=
+                '\nattempted to print surrounding context lines on error, unimplemented feature';
+        }
+        error_msg += '\n';
+        this.raise_err(error_msg);
     }
 
     // lexes a whole token based on a regex.
@@ -122,11 +150,16 @@ class Lexer {
                 col: this.col,
             };
             // handle line/column
-            if (kind === 'newline') {
+            if (kind === 'nl') {
                 this.line++;
                 this.col = 1;
             } else {
                 this.col += match[0].length;
+            }
+            if (kind === 'unknown') {
+                const char = this.text[this.index];
+                const code = this.text.charCodeAt(this.index);
+                this.raise_err_here(`unexpected character '${char}' (${code})`);
             }
             return out;
         }
@@ -145,24 +178,47 @@ class Lexer {
         this.current_token = null;
         return tmp;
     }
-}
 
-let lex = new Lexer(test);
-for (let i = 0; i < 1000; i++) {
-    const next = lex.next();
-    if (next === null) {
-        pront('stopped');
-        break;
+    // skip all the "skippable" token types and return the first one that isn't skippable
+    // the token kind of eof is null (the value, without quotes)
+    skip_while(skippable_token_kinds) {
+        while (true) {
+            const next = this.peek();
+            const token_kind = next?.kind || null;
+            if (!skippable_token_kinds.includes(token_kind)) {
+                return next;
+            }
+            this.next();
+        }
     }
-    pront(
-        `<${next.kind}> "${next.value}" @line ${next.line}, col ${next.col}`,
-        'kind value'
-    );
 }
 
-class Parser {
-    // TODO
+const SKIPPABLE = ['comment', 'ws', 'nl', 'unknown'];
+function parse(lexer) {
+    let next = lexer.skip_while(SKIPPABLE);
+    if (next === null) {
+        lexer.raise_err_here('This rule is empty.', -1);
+        return;
+    }
+    if (next.kind !== 'header' || next.value !== '@RULE') {
+        lexer.raise_err_here(`expected @RULE, found ${next.value}`);
+    }
+    lexer.next();
 }
+
+let lex = new Lexer(test, console.log);
+parse(lex);
+// for (let i = 0; i < 1000; i++) {
+//     const next = lex.next();
+//     if (next === null) {
+//         pront('stopped');
+//         break;
+//     }
+//     pront(
+//         `<${next.kind}> "${next.value}" @line ${next.line}, col ${next.col}`,
+//         'kind value'
+//     );
+// }
 
 // function test1() {
 //     parse(test);
