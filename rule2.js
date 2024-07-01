@@ -29,6 +29,8 @@ a, c, d, e : r, 31, gh, el
    
 `;
 
+test = '@RULE 3333333';
+
 const _ = `
 
 nl = /\r?\n/ TOKEN newline without any prior whitespace.
@@ -88,6 +90,7 @@ class Lexer {
     index = 0;
     line = 1;
     col = 1;
+    lines = [];
     current_token = null;
     // ordered by how likely i think they would appear.
     // only exceptions are special-cased identifiers.
@@ -113,14 +116,27 @@ class Lexer {
     // -1 is no context, just the message.
     // 0 prints a line and column number.
     // >=1 prints that many lines from the rule text for the error.
-    raise_err_here(message, context = 0) {
-        let error_msg = message;
+    raise_err_here(message, context = 1) {
+        const token_length = this.current_token?.value?.length || 1;
+        const col = this.col - token_length;
+
+        let error_msg = '';
         if (context >= 0) {
-            error_msg += ` at line ${this.line}, from column ${this.col}`;
+            error_msg += `Error on line ${this.line}, from column ${col}`;
+        }
+        error_msg += `: ${message}`;
+        if (context >= 0) {
+            const item = this.current_token
+                ? `'${this.current_token.value}'`
+                : 'end of file';
+            error_msg += `, found ${item}.`;
         }
         if (context > 0) {
-            error_msg +=
-                '\nattempted to print surrounding context lines on error, unimplemented feature';
+            const first_line_pos = this.lines[Math.max(0, this.line - context)];
+            error_msg += '\n';
+            error_msg += this.text.slice(first_line_pos);
+            error_msg += '\n';
+            error_msg += ' '.repeat(col - 1) + '^'.repeat(token_length);
         }
         error_msg += '\n';
         this.raise_err(error_msg);
@@ -151,6 +167,7 @@ class Lexer {
             };
             // handle line/column
             if (kind === 'nl') {
+                this.lines.push(this.index - match[0].length);
                 this.line++;
                 this.col = 1;
             } else {
@@ -181,11 +198,11 @@ class Lexer {
 
     // skip all the "skippable" token types and return the first one that isn't skippable
     // the token kind of eof is null (the value, without quotes)
-    skip_while(skippable_token_kinds) {
+    peek_after(skippable) {
         while (true) {
             const next = this.peek();
             const token_kind = next?.kind || null;
-            if (!skippable_token_kinds.includes(token_kind)) {
+            if (!skippable.includes(token_kind)) {
                 return next;
             }
             this.next();
@@ -193,17 +210,37 @@ class Lexer {
     }
 }
 
-const SKIPPABLE = ['comment', 'ws', 'nl', 'unknown'];
-function parse(lexer) {
-    let next = lexer.skip_while(SKIPPABLE);
+const WS = ['comment', 'ws', 'unknown'];
+const WS_NL = WS.concat('nl');
+
+function parse_rule_name(lexer) {
+    const UNNAMED = 'UNNAMED';
+
+    let next = lexer.peek_after(WS_NL);
     if (next === null) {
         lexer.raise_err_here('This rule is empty.', -1);
-        return;
+        return UNNAMED;
     }
     if (next.kind !== 'header' || next.value !== '@RULE') {
         lexer.raise_err_here(`expected @RULE, found ${next.value}`);
+        return UNNAMED;
     }
     lexer.next();
+
+    next = lexer.peek_after(WS);
+    const no_rule_name = 'expected rule name after @RULE';
+    if (next === null) {
+        lexer.raise_err_here(no_rule_name);
+        return UNNAMED;
+    }
+    if (next.kind !== 'ident') {
+        lexer.raise_err_here(no_rule_name);
+        return UNNAMED;
+    }
+}
+
+function parse(lexer) {
+    const rule_name = parse_rule_name(lexer);
 }
 
 let lex = new Lexer(test, console.log);
