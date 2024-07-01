@@ -34,13 +34,13 @@ test = `#
 #[asdfl;j]
 #wha
 # negus
-@RULE 3333333
-
-
-
-
-
+@RULE   3asdf asdl;fjasdfj;
 `;
+
+function dbg(x) {
+    console.log(x);
+    return x;
+}
 
 const _ = `
 
@@ -107,49 +107,80 @@ class Lexer {
     // only exceptions are special-cased identifiers.
     // neighborhoods like margolus|square4cyclic, and symmetries like
     regexes = [
-        ['ws', /[\t\f\cK ]+/y],
-        ['num', /\d+/y],
-        ['kw', /var|n_states|neighborhood|symmetries/y],
+        ['shenanigans', /‮/y],
+        ['whitespace', /[\t\f\cK ]+/y],
+        ['illegal identifier', /\d[-_\w]+/y],
+        ['number', /\d+/y],
+        ['keyword', /var|n_states|neighborhood|symmetries/y],
         ['neighborhood', /margolus|square4cyclic/y],
         ['symmetry', /(none)|rot([24])(ref)?|([xy])ref|(diag)/y], // use the capture group to figure out which one
-        ['ident', /[-_a-zA-Z][-_\w]*/y],
+        ['identifier', /[-_a-zA-Z][-_\w]*/y],
         // comma, colon, equal, and braces are for syntax
         // %^&* are indexing characters and were agreed on during this conversation:
         // https://discord.com/channels/357922255553953794/437055638376284161/1256579184793223198
-        ['punct', /[,:={}%^&*]/y],
-        ['nl', /\r?\n/y],
+        ['punctuation', /[,:={}%^&*]/y],
+        ['newline', /\r?\n/y],
         ['comment', /#.*/y],
         ['header', /@[A-Z]+/y],
         ['unknown', /[\w\W]/y],
     ];
 
+    token_info(token) {
+        const value = token.value;
+        const out = {
+            length: value.length,
+            line: token.line,
+            col: token.col,
+        };
+        switch (token.kind) {
+            case 'shenanigans':
+                out.value = 'Unicode Reverse Shenanigans';
+                return out;
+            case 'end of file':
+                length = 1;
+                out.value = 'End of File';
+                return out;
+            case 'newline':
+                out.value = 'Newline';
+                return out;
+            case 'unknown':
+                const code = value.charCodeAt(0);
+                out.value = `'${value}' (unrecognized character, code: ${code})`;
+                return out;
+            default:
+                out.value = `'${value}' (${token.kind})`;
+                return out;
+        }
+    }
+
     // `context` determines how verbose the error is.
     // -1 is no context, just the message.
     // 0 prints a line and column number.
     // >=1 prints that many lines from the rule text for the error.
-    raise_err_here(message, context = 3) {
-        const token_length = this.current_token?.value?.length || 1;
-        const col = this.col - token_length;
+    //
+    // FOOTGUN: using lexer.next() will make lexer.current_token === null
+    // which makes lexer.raise_err_here() choke without a given token
+    raise_err_here(message, context = 3, token = this.current_token) {
+        let { length, line, col, value } = this.token_info(token);
 
         let error_msg = '';
         if (context >= 0) {
-            error_msg += `Error on line ${this.line}, from column ${col}`;
+            error_msg += `Error on line ${line}, from column ${col}`;
         }
         error_msg += `: ${message}`;
         if (context >= 0) {
-            const item = this.current_token
-                ? `'${this.current_token.value}'`
-                : 'end of file';
-            error_msg += `, found ${item}.`;
+            error_msg += `, found ${value}`;
         }
         if (context > 0) {
-            const first_line_pos =
-                this.line_starts[Math.max(0, this.line - context)];
-            const context_lines = this.text.slice(first_line_pos, this.index);
-            const highlight_arrows =
-                ' '.repeat(col - 1) + '^'.repeat(token_length);
+            const start = this.line_starts[Math.max(0, line - context)];
+            let end = this.index;
+            if (value === 'Newline') {
+                end -= length;
+            }
+            const context_lines = this.text.slice(start, end);
+            const highlight_arrows = ' '.repeat(col - 1) + '^'.repeat(length);
             error_msg += `\n${context_lines}\n${highlight_arrows}`;
-            // TODO: print after
+            // TODO: print after, maybe store a queue of all error tokens?
         }
         error_msg += '\n';
         this.raise_err(error_msg);
@@ -178,22 +209,24 @@ class Lexer {
                 line: this.line,
                 col: this.col,
             };
+
             // handle line/column
-            if (kind === 'nl') {
+            if (kind === 'newline') {
                 this.line_starts.push(this.index);
                 this.line++;
                 this.col = 1;
-            } else {
-                this.col += match[0].length;
+                return out;
             }
-            if (kind === 'unknown') {
-                const char = this.text[this.index];
-                const code = this.text.charCodeAt(this.index);
-                this.raise_err_here(`unexpected character '${char}' (${code})`);
-            }
+            this.col += match[0].length;
+
             return out;
         }
-        return null;
+        return {
+            kind: 'end of file',
+            value: '',
+            line: this.line,
+            col: this.col,
+        };
     }
 
     peek() {
@@ -214,8 +247,7 @@ class Lexer {
     peek_after(skippable) {
         while (true) {
             const next = this.peek();
-            const token_kind = next?.kind || null;
-            if (!skippable.includes(token_kind)) {
+            if (!skippable.includes(next.kind)) {
                 return next;
             }
             this.next();
@@ -223,40 +255,39 @@ class Lexer {
     }
 }
 
-const WS = ['comment', 'ws', 'unknown'];
-const WS_NL = WS.concat('nl');
+const WS = ['comment', 'whitespace'];
+const WS_NL = WS.concat('newline');
 
 function parse_rule_name(lexer) {
     const UNNAMED = 'UNNAMED';
 
     let next = lexer.peek_after(WS_NL);
-    if (next === null) {
+    if (next.kind === 'end of file') {
         lexer.raise_err_here(
             'This rule is empty. Did you comment out the @RULE declaration?',
             -1
         );
         return UNNAMED;
     }
-    if (next.kind !== 'header' || next.value !== '@RULE') {
-        lexer.raise_err_here(`expected @RULE, found ${next.value}`);
+    if (next.value !== '@RULE') {
+        lexer.raise_err_here(`expected @RULE (header)`);
         return UNNAMED;
     }
     lexer.next();
 
     next = lexer.peek_after(WS);
-    const no_rule_name = 'expected rule name after @RULE';
-    if (next === null) {
+    const no_rule_name = 'expected rule name (identifier) after @RULE';
+    if (next.kind !== 'identifier') {
         lexer.raise_err_here(no_rule_name);
         return UNNAMED;
     }
-    if (next.kind !== 'ident') {
-        lexer.raise_err_here(no_rule_name);
-        return UNNAMED;
-    }
+
+    return next.value;
 }
 
 function parse(lexer) {
     const rule_name = parse_rule_name(lexer);
+    console.log(rule_name);
 }
 
 let lex = new Lexer(test, console.log);
