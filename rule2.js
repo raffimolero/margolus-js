@@ -90,7 +90,6 @@ class Lexer {
         this.text = text;
     }
 
-    err_queue = [];
     index = 0;
     line = 1;
     col = 1;
@@ -148,6 +147,11 @@ class Lexer {
 
     /** end_line is exclusive. */
     get_context_lines(start_line, end_line) {
+        // defensive programming
+        if (this.index < this.text.length) {
+            throw 'attempted to get context lines without lexer finishing.';
+        }
+
         const start = this.line_starts[start_line];
         let end = this.line_starts[end_line];
         if (this.text[end - 1] === '\n') {
@@ -159,63 +163,9 @@ class Lexer {
         return this.text.slice(start, end);
     }
 
-    /**
-     * `context` determines how verbose the error is.
-     * context being null just prints the message.
-     * context being [x, y] prints:
-     *   `Error on <line> <col>: {message}, found <token>`,
-     *   then x lines before the error,
-     *   then the error line,
-     *   then an underline under the bad token,
-     *   then y lines after.
-     *
-     * FOOTGUN: using lexer.next() will make lexer.current_token === null
-     * which makes lexer.queue_err_here() choke without a given token
-     */
-    queue_err_here(message, context = [3, 2], token = this.current_token) {
-        if (token === null) {
-            throw 'ATTEMPTED TO QUEUE ERROR WITH NULL TOKEN.\n\
-                This was probably caused by using lexer.next() before lexer.queue_err_here();\n\
-                Consider providing a token beforehand.';
-        }
-        this.err_queue.push({ message, context, token });
-    }
-
-    /** converts an err command into actual text and sends it to `raise_err` */
-    raise_err_with(raise_err, err) {
-        const { message, context, token } = err;
-        const { length, line, col, value } = this.token_info(token);
-
-        let error_msg = '';
-        if (context) {
-            error_msg += `Error on line ${line}, columns ${col}-${
-                col + length - 1
-            }: `;
-        }
-        error_msg += `${message}`;
-        if (context) {
-            error_msg += `, found ${value}`;
-            const [pre, post] = context;
-            // NOTE: `line` starts from 1, get_context_lines uses a 0-indexed exclusive range
-            const pre_context = this.get_context_lines(line - pre - 1, line);
-            const post_context = this.get_context_lines(line, line + post);
-            const highlight_arrows = ' '.repeat(col - 1) + '^'.repeat(length);
-            error_msg += `\n${pre_context}\n${highlight_arrows}\n${post_context}`;
-        }
-        error_msg += '\n';
-        raise_err(error_msg);
-    }
-
-    flush_errs(raise_err = console.log) {
-        for (const err of this.err_queue) {
-            this.raise_err_with(raise_err, err);
-        }
-        this.err_queue = [];
-    }
-
-    finish(raise_err) {
+    /** finishes lexing all tokens, making them accessible to get_context_lines */
+    finish() {
         while (this.next().kind !== 'end of file') {}
-        this.flush_errs(raise_err);
     }
 
     /**
@@ -325,31 +275,100 @@ class Parser {
         this.lexer = new Lexer(text);
     }
 
+    err_queue = [];
+
+    /**
+     * `context` determines how verbose the error is.
+     * context being null just prints the message.
+     * context being [x, y] prints:
+     *   `Error on <line> <col>: {message}, found <token>`,
+     *   then x lines before the error,
+     *   then the error line,
+     *   then an underline under the bad token,
+     *   then y lines after.
+     *
+     * FOOTGUN: using lexer.next() will make lexer.current_token === null
+     * which makes lexer.queue_err_here() choke without a given token
+     */
+    queue_err_here(
+        message,
+        context = [3, 2],
+        token = this.lexer.current_token
+    ) {
+        if (token === null) {
+            throw 'ATTEMPTED TO QUEUE ERROR WITH NULL TOKEN.\n\
+                This was probably caused by using lexer.next() before lexer.queue_err_here();\n\
+                Consider providing a token beforehand.';
+        }
+        this.err_queue.push({ message, context, token });
+    }
+
+    /** converts an err command into actual text and sends it to `raise_err` */
+    raise_err_with(raise_err, err) {
+        const { message, context, token } = err;
+        const { length, line, col, value } = this.lexer.token_info(token);
+
+        let error_msg = '';
+        if (context) {
+            error_msg += `Error on line ${line}, columns ${col}-${
+                col + length - 1
+            }: `;
+        }
+        error_msg += `${message}`;
+        if (context) {
+            error_msg += `, found ${value}`;
+            const [pre, post] = context;
+            // `line` starts from 1, get_context_lines uses a 0-indexed exclusive range
+            const pre_context = this.lexer.get_context_lines(
+                line - pre - 1,
+                line
+            );
+            const post_context = this.lexer.get_context_lines(
+                line,
+                line + post
+            );
+            const highlight_arrows = ' '.repeat(col - 1) + '^'.repeat(length);
+            error_msg += `\n${pre_context}\n${highlight_arrows}\n${post_context}`;
+        }
+        error_msg += '\n';
+        raise_err(error_msg);
+    }
+
+    flush_errs(raise_err = console.log) {
+        for (const err of this.err_queue) {
+            this.raise_err_with(raise_err, err);
+        }
+        this.err_queue = [];
+    }
+
+    finish(raise_err) {
+        this.lexer.finish();
+        this.flush_errs(raise_err);
+    }
+
     parse_rule_name() {
         const UNNAMED = 'UNNAMED';
 
         let next = this.lexer.peek_after(WS_NL);
         if (next.kind === 'end of file') {
-            this.lexer.queue_err_here(
+            this.queue_err_here(
                 'This rule is empty. Did you comment out the @RULE declaration?',
                 null
             );
             return UNNAMED;
         }
         if (next.kind !== 'header') {
-            this.lexer.queue_err_here('expected @RULE (header)');
+            this.queue_err_here('expected @RULE (header)');
             return UNNAMED;
         }
         if (next.value !== '@RULE') {
-            this.lexer.queue_err_here('the first header must be @RULE, but');
+            this.queue_err_here('the first header must be @RULE, but');
         }
         this.lexer.next();
 
         next = this.lexer.peek_after(WS);
         if (next.kind !== 'identifier') {
-            this.lexer.queue_err_here(
-                'expected rule name (identifier) after @RULE'
-            );
+            this.queue_err_here('expected rule name (identifier) after @RULE');
             return UNNAMED;
         }
 
@@ -366,29 +385,12 @@ class Parser {
     }
 
     parse() {
-        const headers = [];
-        console.log('TODO');
-        // while (true) {
-        //     const header = this.find_next_header();
-        //     if (header.kind === 'end of file') {
-        //         break;
-        //     }
-        //     if (headers.find(seen => header.kind === seen.kind)) {
-        //         this.lexer.queue_err_here('');
-        //         continue;
-        //     }
-        //     headers.push(header);
-        //     switch (header) {
-        //         // TODO: list all headers
-        //         case '@RULE':
-        //             break;
-        //         default:
-        //     }
+        this.parse_rule_name();
+        this.finish();
+        // let headers = [];
+        // while (this.lexer.unfinished()) {
+
         // }
-        // const rule_name = parse_rule_name(lexer);
-        // headers.push('@RULE');
-        // const header = find_next_header(lexer);
-        // console.log(rule_name);
     }
 }
 
