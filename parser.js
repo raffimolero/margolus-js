@@ -80,6 +80,7 @@ class Parser {
      */
     parse_newline(line_kind) {
         if (
+            // TODO: figure out if this includes thing can be refactored
             !['newline', 'end of file'].includes(this.lexer.peek_after(WS).kind)
         ) {
             this.queue_err_here(
@@ -117,11 +118,22 @@ class Parser {
         return { kind: 'rule', name };
     }
 
+    /** intended to be used immediately after the '@TABLE' token. */
+    parse_section_table() {
+        if (this.lexer.next().value !== '@TABLE') {
+            throw 'this function was used incorrectly.';
+        }
+
+        const lines = [];
+        // TODO: munch lines until another header is found
+    }
+
     /** lexes until a header or end of file is reached. */
     find_next_header() {
         if (
-            this.lexer.peek_after(WS_NL).kind !== 'header' &&
-            this.lexer.unfinished()
+            !['end of file', 'header'].includes(
+                this.lexer.peek_after(WS_NL).kind
+            )
         ) {
             this.queue_err_here('expected header, such as @RULE or @TABLE');
         }
@@ -132,6 +144,8 @@ class Parser {
         switch (this.find_next_header().value) {
             case '@RULE':
                 return this.parse_section_rule();
+            case '@TABLE':
+                return this.parse_section_table();
             default:
                 this.lexer.next();
                 return { kind: 'unknown' };
@@ -139,7 +153,7 @@ class Parser {
     }
 
     parse_top_level() {
-        let sections = [];
+        const sections = [];
         while (this.lexer.unfinished()) {
             sections.push(this.parse_section());
         }
