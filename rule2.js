@@ -36,8 +36,7 @@ test = `#
 # negus
 @RULE  @RULE @RULE 3asdf asdl;fjasdfj;
 la;sdfjkl
-
-
+asdfjkl;asdf
 asdf
 df
 
@@ -175,11 +174,15 @@ class Lexer {
         this.err_queue.push({ message, context, token });
     }
 
+    // end_line is exclusive.
     get_context_lines(start_line, end_line) {
         const start = this.line_starts[start_line];
         let end = this.line_starts[end_line];
-        while (this.text[end - 1] === '\n' || this.text[end - 1] === '\r') {
+        if (this.text[end - 1] === '\n') {
             end--;
+            if (this.text[end - 1] === '\r') {
+                end--;
+            }
         }
         return this.text.slice(start, end);
     }
@@ -199,12 +202,9 @@ class Lexer {
         if (context) {
             error_msg += `, found ${value}`;
             const [pre, post] = context;
+            // NOTE: `line` starts from 1, get_context_lines uses a 0-indexed exclusive range
             const pre_context = this.get_context_lines(line - pre - 1, line);
-            const post_context = this.get_context_lines(
-                line + 1,
-                line + 1 + post
-            );
-            dbg(post_context);
+            const post_context = this.get_context_lines(line, line + post);
             const highlight_arrows = ' '.repeat(col - 1) + '^'.repeat(length);
             error_msg += `\n${pre_context}\n${highlight_arrows}\n${post_context}`;
         }
