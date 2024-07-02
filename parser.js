@@ -73,6 +73,22 @@ class Parser {
         this.err_queue = [];
     }
 
+    /**
+     * errors if anything other than newline or end of file is found.
+     *
+     * pass the kind of line you are trying to parse
+     */
+    parse_newline(line_kind) {
+        if (
+            !['newline', 'end of file'].includes(this.lexer.peek_after(WS).kind)
+        ) {
+            this.queue_err_here(
+                'expected nothing but comments or a newline after ' + line_kind
+            );
+        }
+        this.lexer.peek_until(['newline']);
+    }
+
     /** intended to be used immediately after the '@RULE' token. */
     parse_section_rule() {
         if (this.lexer.next().value !== '@RULE') {
@@ -82,30 +98,38 @@ class Parser {
         let name = 'UNNAMED';
 
         let token = this.lexer.peek_after(WS);
-        if (token.kind === 'identifier') {
-            name = token.value;
-        } else {
-            this.queue_err_here('expected rule name (identifier) after @RULE');
+        switch (token.kind) {
+            case 'identifier':
+                name = token.value;
+                this.lexer.next();
+                break;
+            case 'newline':
+                break;
+            default:
+                this.queue_err_here(
+                    'expected rule name (identifier) after @RULE'
+                );
+                this.lexer.next();
         }
-        if (this.lexer.peek_after(WS).kind !== 'newline') {
-            this.queue_err_here(
-                'expected nothing but a newline after rule name'
-            );
-        }
-        this.lexer.peek_after(WS_NL);
+
+        this.parse_newline('rule name');
 
         return { kind: 'rule', name };
     }
 
+    /** lexes until a header or end of file is reached. */
     find_next_header() {
-        if (this.lexer.peek_after(WS_NL).kind !== 'header') {
+        if (
+            this.lexer.peek_after(WS_NL).kind !== 'header' &&
+            this.lexer.unfinished()
+        ) {
             this.queue_err_here('expected header, such as @RULE or @TABLE');
         }
         return this.lexer.peek_until(['header']);
     }
 
     parse_section() {
-        switch (this.find_next_header()) {
+        switch (this.find_next_header().value) {
             case '@RULE':
                 return this.parse_section_rule();
             default:

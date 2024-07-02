@@ -29,8 +29,18 @@ a, c, d, e : r, 31, gh, el
    
 `;
 
-test = `@RULE
-ASDLFKJ`;
+test = `
+@RULE #asdlfjk;
+@RULE @RULE @RULE
+@RULE @TABLE
+@RULE 3
+
+@RULE 3ASDLFKJ asdf asf
+
+@TABLE
+
+
+`;
 
 function dbg(x) {
     console.log(x);
@@ -72,7 +82,8 @@ function pront(thing, note = null) {
 
 pront('RUNNING RULE2.JS');
 
-new Parser(test).parse(console.log);
+const out = new Parser(test).parse(console.log);
+console.log(out);
 
 // for (let i = 0; i < 1000; i++) {
 //     const next = lex.next();
