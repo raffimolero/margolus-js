@@ -31,14 +31,7 @@ a, c, d, e : r, 31, gh, el
 
 test = `#
 
-#[asdfl;j]
-#wha
-# negus
-@RULE  @RULE @RULE 3asdf asdl;fjasdfj;
-la;sdfjkl
-asdfjkl;asdf
-asdf
-df
+@RULE @RULE @RULE
 
 `;
 
@@ -82,12 +75,11 @@ function pront(thing, note = null) {
 
 pront('RUNNING RULE2.JS');
 
-// lexes stuff.
-// TOKEN TYPES:
-// identifier
-// number
-// punctuation
-// newline
+/**
+ * lexes stuff.
+ *
+ * also handles line and column numbers, as well as error formatting.
+ */
 class Lexer {
     text;
     constructor(text) {
@@ -154,27 +146,7 @@ class Lexer {
         }
     }
 
-    // `context` determines how verbose the error is.
-    // context being null just prints the message.
-    // context being [x, y] prints:
-    //   `Error on <line> <col>: {message}, found <token>`,
-    //   then x lines before the error,
-    //   then the error line,
-    //   then an underline under the bad token,
-    //   then y lines after.
-    //
-    // FOOTGUN: using lexer.next() will make lexer.current_token === null
-    // which makes lexer.queue_err_here() choke without a given token
-    queue_err_here(message, context = [3, 2], token = this.current_token) {
-        if (token === null) {
-            throw 'ATTEMPTED TO QUEUE ERROR WITH NULL TOKEN.\n\
-                This was probably caused by using lexer.next() before lexer.queue_err_here();\n\
-                Consider providing a token beforehand.';
-        }
-        this.err_queue.push({ message, context, token });
-    }
-
-    // end_line is exclusive.
+    /** end_line is exclusive. */
     get_context_lines(start_line, end_line) {
         const start = this.line_starts[start_line];
         let end = this.line_starts[end_line];
@@ -187,7 +159,29 @@ class Lexer {
         return this.text.slice(start, end);
     }
 
-    // converts an err command into actual text and sends it to `raise_err`
+    /**
+     * `context` determines how verbose the error is.
+     * context being null just prints the message.
+     * context being [x, y] prints:
+     *   `Error on <line> <col>: {message}, found <token>`,
+     *   then x lines before the error,
+     *   then the error line,
+     *   then an underline under the bad token,
+     *   then y lines after.
+     *
+     * FOOTGUN: using lexer.next() will make lexer.current_token === null
+     * which makes lexer.queue_err_here() choke without a given token
+     */
+    queue_err_here(message, context = [3, 2], token = this.current_token) {
+        if (token === null) {
+            throw 'ATTEMPTED TO QUEUE ERROR WITH NULL TOKEN.\n\
+                This was probably caused by using lexer.next() before lexer.queue_err_here();\n\
+                Consider providing a token beforehand.';
+        }
+        this.err_queue.push({ message, context, token });
+    }
+
+    /** converts an err command into actual text and sends it to `raise_err` */
     raise_err_with(raise_err, err) {
         const { message, context, token } = err;
         const { length, line, col, value } = this.token_info(token);
@@ -224,8 +218,12 @@ class Lexer {
         this.flush_errs(raise_err);
     }
 
-    // lexes a whole token based on a regex.
-    // returns a string representing the regex match, or null if the string does not start with a match.
+    /**
+     * lexes a whole token based on a regex.
+     *
+     * returns a string representing the regex match,
+     * or null if the string does not start with a match.
+     */
     try_regex(regex) {
         regex.lastIndex = this.index;
         const match = regex.exec(this.text);
@@ -235,7 +233,7 @@ class Lexer {
         return match;
     }
 
-    // returns the next recognized token in the text.
+    /** returns the next recognized token in the text. */
     read_token() {
         for (const [kind, regex] of this.regexes) {
             const match = this.try_regex(regex);
@@ -268,7 +266,7 @@ class Lexer {
         };
     }
 
-    // peeks the next token. the same token can be consumed using next().
+    /** peeks the next token. the same token can be consumed using next(). */
     peek() {
         if (this.current_token === null) {
             this.current_token = this.read_token();
@@ -276,75 +274,125 @@ class Lexer {
         return this.current_token;
     }
 
-    // returns the next token, then sets the peeked token to null.
+    /** returns the next token, then sets the peeked token to null. */
     next() {
         const tmp = this.peek();
         this.current_token = null;
         return tmp;
     }
 
-    // skip all the "skippable" token types and return the first one that isn't skippable
-    // the token kind of eof is null (the value, without quotes)
-    peek_after(skippable) {
+    /**
+     * skip all tokens where cond returns false.
+     * returns the first token where cond returns true.
+     * may return end of file
+     */
+    skip_until(cond) {
         while (true) {
             const next = this.peek();
-            if (!skippable.includes(next.kind)) {
+            if (cond(next) || next.kind === 'end of file') {
                 return next;
             }
             this.next();
         }
     }
+
+    /** skip_until but with an inverted cond */
+    skip_while(cond) {
+        while (true) {
+            const next = this.peek();
+            if (!cond(next) || next.kind === 'end of file') {
+                return next;
+            }
+            this.next();
+        }
+    }
+
+    /** returns the first token whose kind is in the expected array */
+    peek_until = expected =>
+        this.skip_until(next => expected.includes(next.kind));
+
+    /** returns the first token whose kind isn't in the skippable array */
+    peek_after = skippable =>
+        this.skip_while(next => skippable.includes(next.kind));
 }
 
 const WS = ['comment', 'whitespace'];
 const WS_NL = WS.concat('newline');
 
-function parse_rule_name(lexer) {
-    const UNNAMED = 'UNNAMED';
-
-    let next = lexer.peek_after(WS_NL);
-    if (next.kind === 'end of file') {
-        lexer.queue_err_here(
-            'This rule is empty. Did you comment out the @RULE declaration?',
-            -1
-        );
-        return UNNAMED;
-    }
-    if (next.value !== '@RULE') {
-        lexer.queue_err_here(`expected @RULE (header)`);
-        return UNNAMED;
-    }
-    lexer.next();
-
-    next = lexer.peek_after(WS);
-    const no_rule_name = 'expected rule name (identifier) after @RULE';
-    if (next.kind !== 'identifier') {
-        lexer.queue_err_here(no_rule_name);
-        return UNNAMED;
+class Parser {
+    lexer;
+    constructor(text) {
+        this.lexer = new Lexer(text);
     }
 
-    return next.value;
+    parse_rule_name() {
+        const UNNAMED = 'UNNAMED';
+
+        let next = this.lexer.peek_after(WS_NL);
+        if (next.kind === 'end of file') {
+            this.lexer.queue_err_here(
+                'This rule is empty. Did you comment out the @RULE declaration?',
+                null
+            );
+            return UNNAMED;
+        }
+        if (next.kind !== 'header') {
+            this.lexer.queue_err_here('expected @RULE (header)');
+            return UNNAMED;
+        }
+        if (next.value !== '@RULE') {
+            this.lexer.queue_err_here('the first header must be @RULE, but');
+        }
+        this.lexer.next();
+
+        next = this.lexer.peek_after(WS);
+        if (next.kind !== 'identifier') {
+            this.lexer.queue_err_here(
+                'expected rule name (identifier) after @RULE'
+            );
+            return UNNAMED;
+        }
+
+        return next.value;
+    }
+
+    find_next_header() {
+        if (this.lexer.peek_after(WS_NL).kind !== 'header') {
+            this.lexer.queue_err_here(
+                'expected header, such as @RULE or @TABLE'
+            );
+        }
+        return this.lexer.peek_until(['header']);
+    }
+
+    parse() {
+        const headers = [];
+        console.log('TODO');
+        // while (true) {
+        //     const header = this.find_next_header();
+        //     if (header.kind === 'end of file') {
+        //         break;
+        //     }
+        //     if (headers.find(seen => header.kind === seen.kind)) {
+        //         this.lexer.queue_err_here('');
+        //         continue;
+        //     }
+        //     headers.push(header);
+        //     switch (header) {
+        //         // TODO: list all headers
+        //         case '@RULE':
+        //             break;
+        //         default:
+        //     }
+        // }
+        // const rule_name = parse_rule_name(lexer);
+        // headers.push('@RULE');
+        // const header = find_next_header(lexer);
+        // console.log(rule_name);
+    }
 }
 
-function parse_anything(lexer) {
-    lexer.next();
-}
-
-function parse_rule(lexer) {
-    const rule_name = parse_rule_name(lexer);
-    parse_rule_name(lexer);
-    parse_rule_name(lexer);
-    parse_rule_name(lexer);
-    parse_rule_name(lexer);
-    console.log(rule_name);
-}
-
-function parse(text) {
-    let lexer = new Lexer(text);
-    parse_rule(lexer);
-    lexer.finish();
-}
-parse(test);
+new Parser(test).parse();
 
 // for (let i = 0; i < 1000; i++) {
 //     const next = lex.next();
