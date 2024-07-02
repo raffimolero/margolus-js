@@ -29,11 +29,7 @@ a, c, d, e : r, 31, gh, el
    
 `;
 
-test = `#
-
-@RULE @RULE @RULE
-
-`;
+test = `@`;
 
 function dbg(x) {
     console.log(x);
@@ -93,7 +89,7 @@ class Lexer {
     index = 0;
     line = 1;
     col = 1;
-    line_starts = [0];
+    lines = [0];
     current_token = null;
     // ordered by how likely i think they would appear.
     // only exceptions are special-cased identifiers.
@@ -113,7 +109,7 @@ class Lexer {
         ['punctuation', /[,:={}%^&*]/y],
         ['newline', /\r?\n/y],
         ['comment', /#.*/y],
-        ['header', /@[A-Z]+/y],
+        ['header', /@[A-Z]*/y],
         ['unknown', /[\w\W]/y],
     ];
 
@@ -133,7 +129,7 @@ class Lexer {
                 out.value = `'${value}' (unrecognized character, code: ${code})`;
                 return out;
             case 'end of file':
-                length = 1;
+                out.length = 1;
                 out.value = 'End of File';
                 return out;
             case 'shenanigans':
@@ -148,12 +144,13 @@ class Lexer {
     /** end_line is exclusive. */
     get_context_lines(start_line, end_line) {
         // defensive programming
-        if (this.index < this.text.length) {
+        if (this.unfinished()) {
             throw 'attempted to get context lines without lexer finishing.';
         }
 
-        const start = this.line_starts[start_line];
-        let end = this.line_starts[end_line];
+        const clamp = val => Math.max(0, Math.min(this.lines.length - 1, val));
+        const start = this.lines[clamp(start_line)];
+        let end = this.lines[clamp(end_line)];
         if (this.text[end - 1] === '\n') {
             end--;
             if (this.text[end - 1] === '\r') {
@@ -163,9 +160,15 @@ class Lexer {
         return this.text.slice(start, end);
     }
 
+    /** returns true if end of file has not been reached. */
+    unfinished() {
+        return this.peek().kind !== 'end of file';
+    }
+
     /** finishes lexing all tokens, making them accessible to get_context_lines */
     finish() {
         while (this.next().kind !== 'end of file') {}
+        this.lines.push(this.index);
     }
 
     /**
@@ -199,7 +202,7 @@ class Lexer {
 
             // handle line/column
             if (kind === 'newline') {
-                this.line_starts.push(this.index);
+                this.lines.push(this.index);
                 this.line++;
                 this.col = 1;
                 return out;
@@ -323,12 +326,12 @@ class Parser {
                 line - pre - 1,
                 line
             );
-            const post_context = this.lexer.get_context_lines(
-                line,
-                line + post
-            );
+            let post_context = this.lexer.get_context_lines(line, line + post);
+            if (post_context) {
+                post_context = '\n' + post_context;
+            }
             const highlight_arrows = ' '.repeat(col - 1) + '^'.repeat(length);
-            error_msg += `\n${pre_context}\n${highlight_arrows}\n${post_context}`;
+            error_msg += `\n${pre_context}\n${highlight_arrows}${post_context}`;
         }
         error_msg += '\n';
         raise_err(error_msg);
@@ -341,56 +344,66 @@ class Parser {
         this.err_queue = [];
     }
 
+    /** intended to be used immediately after the '@RULE' token. */
+    parse_section_rule() {
+        // the current token is @RULE.
+        this.lexer.next();
+
+        let name = 'UNNAMED';
+
+        let token = this.lexer.peek_after(WS);
+        if (token.kind === 'identifier') {
+            name = token.value;
+        } else {
+            this.queue_err_here('expected rule name (identifier) after @RULE');
+        }
+        if (this.lexer.peek_after(WS).kind !== 'newline') {
+            this.queue_err_here(
+                'expected nothing but a newline after rule name'
+            );
+        }
+        this.lexer.peek_after(WS_NL);
+
+        return { kind: 'rule', name };
+    }
+
+    find_next_header() {
+        if (this.lexer.peek_after(WS_NL).kind !== 'header') {
+            this.queue_err_here('expected header, such as @RULE or @TABLE');
+        }
+        return this.lexer.peek_until(['header']);
+    }
+
+    parse_section() {
+        switch (this.find_next_header()) {
+            case '@RULE':
+                return this.parse_section_rule();
+            default:
+                this.lexer.next();
+                return { kind: 'unknown' };
+        }
+    }
+
+    parse_top_level() {
+        let sections = [];
+        while (this.lexer.unfinished()) {
+            sections.push(this.parse_section());
+        }
+        return {
+            kind: 'file',
+            sections,
+        };
+    }
+
     finish(raise_err) {
         this.lexer.finish();
         this.flush_errs(raise_err);
     }
 
-    parse_rule_name() {
-        const UNNAMED = 'UNNAMED';
-
-        let next = this.lexer.peek_after(WS_NL);
-        if (next.kind === 'end of file') {
-            this.queue_err_here(
-                'This rule is empty. Did you comment out the @RULE declaration?',
-                null
-            );
-            return UNNAMED;
-        }
-        if (next.kind !== 'header') {
-            this.queue_err_here('expected @RULE (header)');
-            return UNNAMED;
-        }
-        if (next.value !== '@RULE') {
-            this.queue_err_here('the first header must be @RULE, but');
-        }
-        this.lexer.next();
-
-        next = this.lexer.peek_after(WS);
-        if (next.kind !== 'identifier') {
-            this.queue_err_here('expected rule name (identifier) after @RULE');
-            return UNNAMED;
-        }
-
-        return next.value;
-    }
-
-    find_next_header() {
-        if (this.lexer.peek_after(WS_NL).kind !== 'header') {
-            this.lexer.queue_err_here(
-                'expected header, such as @RULE or @TABLE'
-            );
-        }
-        return this.lexer.peek_until(['header']);
-    }
-
-    parse() {
-        this.parse_rule_name();
-        this.finish();
-        // let headers = [];
-        // while (this.lexer.unfinished()) {
-
-        // }
+    parse(raise_err) {
+        const out = this.parse_top_level();
+        this.finish(raise_err);
+        return out;
     }
 }
 
