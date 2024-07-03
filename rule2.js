@@ -39,6 +39,19 @@ test = `
 
 @TABLE
 
+neighborhood: moo
+symmetries: quack
+sym: asdf
+var works?
+asdf, asdf, asdf: 1 2 3
+3 4 5: 1 2 3
+
+31adfasd
+test # asdl;fj
+#copmment
+
+@TABLE
+woah #another table
 
 `;
 

@@ -1,5 +1,10 @@
-const WS = ['comment', 'whitespace'];
-const WS_NL = WS.concat('newline');
+const WS = ['whitespace'];
+const NL = ['newline', 'comment'];
+const WS_NL = WS.concat(NL);
+
+function matches_or_eof(token, kinds) {
+    return kinds.includes(token.kind) || token.kind === 'end of file';
+}
 
 class Parser {
     lexer;
@@ -79,10 +84,7 @@ class Parser {
      * pass the kind of line you are trying to parse
      */
     parse_newline(line_kind) {
-        if (
-            // TODO: figure out if this includes thing can be refactored
-            !['newline', 'end of file'].includes(this.lexer.peek_after(WS).kind)
-        ) {
+        if (!matches_or_eof(this.lexer.peek_after(WS), NL)) {
             this.queue_err_here(
                 'expected nothing but comments or a newline after ' + line_kind
             );
@@ -99,18 +101,13 @@ class Parser {
         let name = 'UNNAMED';
 
         let token = this.lexer.peek_after(WS);
-        switch (token.kind) {
-            case 'identifier':
-                name = token.value;
-                this.lexer.next();
-                break;
-            case 'newline':
-                break;
-            default:
-                this.queue_err_here(
-                    'expected rule name (identifier) after @RULE'
-                );
-                this.lexer.next();
+        if (token.kind === 'identifier') {
+            name = token.value;
+        } else {
+            this.queue_err_here('expected rule name (identifier) after @RULE');
+        }
+        if (!matches_or_eof(token, WS_NL)) {
+            this.lexer.next();
         }
 
         this.parse_newline('rule name');
@@ -118,23 +115,61 @@ class Parser {
         return { kind: 'rule', name };
     }
 
+    parse_sts_keyword() {
+        this.queue_err_here('NOT IMPLEMENTED');
+        this.lexer.peek_until(['newline']);
+        this.lexer.next();
+    }
+
+    parse_sts_transition() {
+        this.queue_err_here('NOT IMPLEMENTED');
+        this.lexer.peek_until(['newline']);
+        this.lexer.next();
+    }
+
+    /** returns null when a header is found. */
+    parse_section_table_statement() {
+        switch (this.lexer.peek_after(WS_NL).kind) {
+            case 'keyword':
+                return this.parse_sts_keyword();
+            case 'identifier':
+            case 'number':
+                return this.parse_sts_transition();
+            case 'header':
+            case 'end of file':
+                return null;
+            default:
+                this.queue_err_here(
+                    'expected a valid table statement (neighborhood, symmetries, var, transition)'
+                );
+                this.lexer.peek_until(['newline']);
+                this.lexer.next();
+                return { kind: 'unknown' };
+        }
+    }
+
     /** intended to be used immediately after the '@TABLE' token. */
     parse_section_table() {
         if (this.lexer.next().value !== '@TABLE') {
             throw 'this function was used incorrectly.';
         }
+        this.parse_newline('table header');
 
-        const lines = [];
-        // TODO: munch lines until another header is found
+        const statements = [];
+        while (true) {
+            const statement = this.parse_section_table_statement();
+            if (statement === null) {
+                break;
+            }
+            statements.push(statement);
+        }
+
+        return { kind: 'table', statements };
     }
 
     /** lexes until a header or end of file is reached. */
     find_next_header() {
-        if (
-            !['end of file', 'header'].includes(
-                this.lexer.peek_after(WS_NL).kind
-            )
-        ) {
+        if (!matches_or_eof(this.lexer.peek_after(WS_NL), 'header')) {
             this.queue_err_here('expected header, such as @RULE or @TABLE');
         }
         return this.lexer.peek_until(['header']);
@@ -147,6 +182,7 @@ class Parser {
             case '@TABLE':
                 return this.parse_section_table();
             default:
+                this.queue_err_here('unrecognized header');
                 this.lexer.next();
                 return { kind: 'unknown' };
         }

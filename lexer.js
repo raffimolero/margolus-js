@@ -52,7 +52,7 @@ class Lexer {
                 out.value = 'Newline';
                 return out;
             case 'illegal identifier':
-                out.value = `'${value}' (identifiers cannot start with a number)`;
+                out.value = `'${value}' (illegal identifier; must not start with a number)`;
                 return out;
             case 'unknown':
                 const code = value.charCodeAt(0);
