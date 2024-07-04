@@ -138,9 +138,11 @@ class Parser {
     }
 
     parse_punctuation(value, name, cue) {
-        if (this.lexer.peek_after(WS).value === value) {
+        const token = this.lexer.peek_after(WS);
+        if (token.kind === 'punctuation') {
             this.lexer.next();
-        } else {
+        }
+        if (token.value !== value) {
             this.queue_err_here(`expected ${name} (punctuation) after ${cue}`);
         }
     }
