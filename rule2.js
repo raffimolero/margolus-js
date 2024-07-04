@@ -58,11 +58,6 @@ woah #another table
 
 `;
 
-function dbg(x) {
-    console.log(x);
-    return x;
-}
-
 const _ = `
 
 nl = /\r?\n/ TOKEN newline without any prior whitespace.

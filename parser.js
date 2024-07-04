@@ -80,6 +80,13 @@ class Parser {
         this.err_queue = [];
     }
 
+    /** errors if the next token is not the provided value */
+    parse_exact_token(value) {
+        if (this.lexer.next().value !== value) {
+            panic();
+        }
+    }
+
     /**
      * errors if anything other than newline or end of file is found.
      *
@@ -123,17 +130,13 @@ class Parser {
 
     /** intended to be used when the next token is '@RULE' */
     parse_section_rule() {
-        if (this.lexer.next().value !== '@RULE') {
-            throw 'this function was used incorrectly.';
-        }
-
+        this.parse_exact_token('@RULE');
         const name = this.parse_token_before_newline(
             'rule name',
             'identifier',
             'expected rule name (identifier) after @RULE',
             'UNNAMED'
         );
-
         return { kind: 'rule', name };
     }
 
@@ -153,19 +156,14 @@ class Parser {
         expect_msg,
         default_value = MISSING_TOKEN_VALUE
     ) {
-        if (this.lexer.next().value !== field_name) {
-            throw 'this function was used incorrectly';
-        }
-
+        this.parse_exact_token(field_name);
         this.parse_punctuation(':', 'colon', field_name);
-
         const value = this.parse_token_before_newline(
             field_name,
             token_kind,
             expect_msg,
             default_value
         );
-
         return { kind: field_name, value };
     }
 
@@ -195,7 +193,9 @@ class Parser {
 
     /**
      * section table statement keyword:
-     * parses a variable
+     * use when the next token is 'var'
+     *
+     * var name, name, name = { item, item, item }
      */
     parse_stsk_var() {
         // TODO:
@@ -218,7 +218,7 @@ class Parser {
             case 'var':
                 return this.parse_stsk_var();
             default:
-                throw 'this function was used incorrectly.';
+                panic();
         }
     }
 
@@ -255,9 +255,7 @@ class Parser {
 
     /** intended to be used when the next token is '@TABLE' */
     parse_section_table() {
-        if (this.lexer.next().value !== '@TABLE') {
-            throw 'this function was used incorrectly.';
-        }
+        this.parse_exact_token('@TABLE');
         this.parse_immediate_newline('table header');
 
         const statements = [];
