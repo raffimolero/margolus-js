@@ -39,6 +39,7 @@ test = `
 
 @TABLE
 
+;;;;;symmetries none
 neighborhood: moo
 symmetries: quack
 sym: asdf
@@ -52,6 +53,8 @@ test # asdl;fj
 
 @TABLE
 woah #another table
+    symmetries   : moore
+  neighborhood : none #asdfj
 
 `;
 

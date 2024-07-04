@@ -2,6 +2,8 @@ const WS = ['whitespace'];
 const NL = ['newline', 'comment'];
 const WS_NL = WS.concat(NL);
 
+const MISSING_TOKEN_VALUE = 'MISSING';
+
 function matches_or_eof(token, kinds) {
     return kinds.includes(token.kind) || token.kind === 'end of file';
 }
@@ -83,7 +85,7 @@ class Parser {
      *
      * pass the kind of line you are trying to parse
      */
-    parse_newline(line_kind) {
+    parse_immediate_newline(line_kind) {
         if (!matches_or_eof(this.lexer.peek_after(WS), NL)) {
             this.queue_err_here(
                 'expected nothing but comments or a newline after ' + line_kind
@@ -92,43 +94,143 @@ class Parser {
         this.lexer.peek_until(['newline']);
     }
 
-    /** intended to be used immediately after the '@RULE' token. */
+    /**
+     * errors if anything other than newline or end of file is found after the current token.
+     *
+     * pass the kind of line you are trying to parse
+     */
+    parse_token_before_newline(
+        line_kind,
+        token_kind,
+        expect_msg,
+        default_value = MISSING_TOKEN_VALUE
+    ) {
+        let value = default_value;
+        let token = this.lexer.peek_after(WS);
+        if (token.kind === token_kind) {
+            value = token.value;
+        } else {
+            this.queue_err_here(expect_msg);
+        }
+
+        if (!matches_or_eof(token, WS_NL)) {
+            this.lexer.next();
+        }
+        this.parse_immediate_newline(line_kind);
+
+        return value;
+    }
+
+    /** intended to be used when the next token is '@RULE' */
     parse_section_rule() {
         if (this.lexer.next().value !== '@RULE') {
             throw 'this function was used incorrectly.';
         }
 
-        let name = 'UNNAMED';
-
-        let token = this.lexer.peek_after(WS);
-        if (token.kind === 'identifier') {
-            name = token.value;
-        } else {
-            this.queue_err_here('expected rule name (identifier) after @RULE');
-        }
-        if (!matches_or_eof(token, WS_NL)) {
-            this.lexer.next();
-        }
-
-        this.parse_newline('rule name');
+        const name = this.parse_token_before_newline(
+            'rule name',
+            'identifier',
+            'expected rule name (identifier) after @RULE',
+            'UNNAMED'
+        );
 
         return { kind: 'rule', name };
     }
 
-    parse_sts_keyword() {
-        this.queue_err_here('NOT IMPLEMENTED');
-        this.lexer.peek_until(['newline']);
-        this.lexer.next();
+    parse_punctuation(value, name, cue) {
+        if (this.lexer.peek_after(WS).value === value) {
+            this.lexer.next();
+        } else {
+            this.queue_err_here(`expected ${name} (punctuation) after ${cue}`);
+        }
     }
 
-    parse_sts_transition() {
+    parse_field_colon_value(
+        field_name,
+        token_kind,
+        expect_msg,
+        default_value = MISSING_TOKEN_VALUE
+    ) {
+        if (this.lexer.next().value !== field_name) {
+            throw 'this function was used incorrectly';
+        }
+
+        this.parse_punctuation(':', 'colon', field_name);
+
+        const value = this.parse_token_before_newline(
+            field_name,
+            token_kind,
+            expect_msg,
+            default_value
+        );
+
+        return { kind: field_name, value };
+    }
+
+    /**
+     * section table statement keyword:
+     * use when the next token is 'neighborhood'
+     */
+    parse_stsk_neighborhood() {
+        return this.parse_field_colon_value(
+            'neighborhood',
+            'neighborhood',
+            'expected a neighborhood name, like margolus or square4cyclic'
+        );
+    }
+
+    /**
+     * section table statement keyword:
+     * use when the next token is 'symmetries'
+     */
+    parse_stsk_symmetries() {
+        return this.parse_field_colon_value(
+            'symmetries',
+            'symmetry',
+            'expected a symmetry type, like none or rot4ref (symmetries listed in documentation)'
+        );
+    }
+
+    /**
+     * section table statement keyword:
+     * parses a variable
+     */
+    parse_stsk_var() {
+        // TODO:
         this.queue_err_here('NOT IMPLEMENTED');
         this.lexer.peek_until(['newline']);
         this.lexer.next();
+        return { kind: 'variable' };
+    }
+
+    /**
+     * section table statement:
+     * parses a table statement that starts with a keyword
+     */
+    parse_sts_keyword() {
+        switch (this.lexer.peek().value) {
+            case 'neighborhood':
+                return this.parse_stsk_neighborhood();
+            case 'symmetries':
+                return this.parse_stsk_symmetries();
+            case 'var':
+                return this.parse_stsk_var();
+            default:
+                throw 'this function was used incorrectly.';
+        }
+    }
+
+    /** section table statement */
+    parse_sts_transition() {
+        // TODO:
+        this.queue_err_here('NOT IMPLEMENTED');
+        this.lexer.peek_until(['newline']);
+        this.lexer.next();
+        return { kind: 'transition' };
     }
 
     /** returns null when a header is found. */
-    parse_section_table_statement() {
+    parse_section_table_statement(should_error) {
         switch (this.lexer.peek_after(WS_NL).kind) {
             case 'keyword':
                 return this.parse_sts_keyword();
@@ -139,28 +241,33 @@ class Parser {
             case 'end of file':
                 return null;
             default:
-                this.queue_err_here(
-                    'expected a valid table statement (neighborhood, symmetries, var, transition)'
-                );
-                this.lexer.peek_until(['newline']);
+                if (should_error) {
+                    this.queue_err_here(
+                        'expected a valid table statement (neighborhood, symmetries, var, transition)'
+                    );
+                }
                 this.lexer.next();
                 return { kind: 'unknown' };
         }
     }
 
-    /** intended to be used immediately after the '@TABLE' token. */
+    /** intended to be used when the next token is '@TABLE' */
     parse_section_table() {
         if (this.lexer.next().value !== '@TABLE') {
             throw 'this function was used incorrectly.';
         }
-        this.parse_newline('table header');
+        this.parse_immediate_newline('table header');
 
         const statements = [];
+        let should_error = true;
         while (true) {
-            const statement = this.parse_section_table_statement();
+            const statement = this.parse_section_table_statement(should_error);
             if (statement === null) {
                 break;
             }
+            // will not error on multiple consecutive bad tokens
+            // will error only if the previous token was known
+            should_error = statement.kind !== 'unknown';
             statements.push(statement);
         }
 
@@ -175,6 +282,7 @@ class Parser {
         return this.lexer.peek_until(['header']);
     }
 
+    /** parses a section marked by an @ header */
     parse_section() {
         switch (this.find_next_header().value) {
             case '@RULE':

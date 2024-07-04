@@ -123,9 +123,11 @@ class Lexer {
             if (match === null) {
                 continue;
             }
+            const value = match.shift();
             const out = {
                 kind,
-                value: match[0],
+                value,
+                captures: match,
                 line: this.line,
                 col: this.col,
             };
@@ -137,7 +139,7 @@ class Lexer {
                 this.col = 1;
                 return out;
             }
-            this.col += match[0].length;
+            this.col += value.length;
 
             return out;
         }
