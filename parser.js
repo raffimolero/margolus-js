@@ -3,6 +3,7 @@ const NL = ['newline', 'comment'];
 const WS_NL = WS.concat(NL);
 
 const MISSING_TOKEN_VALUE = 'MISSING';
+const UNKNOWN = { kind: 'unknown' };
 
 function matches_or_eof(token, kinds) {
     return kinds.includes(token.kind) || token.kind === 'end of file';
@@ -182,6 +183,7 @@ class Parser {
     /**
      * section table statement keyword:
      * use when the next token is 'symmetries'
+     *
      */
     parse_stsk_symmetries() {
         return this.parse_field_colon_value(
@@ -192,10 +194,22 @@ class Parser {
     }
 
     /**
+     * item filter mapper must return either something to put into an array,
+     * or null if the list ends, usually because it found a stop token.
+     *
+     * @param {(Token) => T | null} item_filter_mapper
+     * @param {[string]} allowed_spacing
+     * @returns {[T]}
+     */
+    parse_comma_delimited(item_filter_mapper, allowed_spacing) {
+        // TODO:
+    }
+
+    /**
      * section table statement keyword:
      * use when the next token is 'var'
      *
-     * var name, name, name = { item, item, item }
+     * var a,b,c,d,e,f,g,h = { item, item, item }
      */
     parse_stsk_var() {
         // TODO:
@@ -203,6 +217,19 @@ class Parser {
         this.lexer.peek_until(['newline']);
         this.lexer.next();
         return { kind: 'variable' };
+
+        this.parse_exact_token('var');
+
+        let vars = [];
+        while (true) {
+            const token = this.lexer.peek_after(WS_NL);
+            if (this.token.kind === 'identifier') {
+                vars.push(this.token.value);
+                this.lexer.next();
+            } else {
+                this.queue_err_here('expected variable name (identifier)');
+            }
+        }
     }
 
     /**
@@ -249,7 +276,7 @@ class Parser {
                     );
                 }
                 this.lexer.next();
-                return { kind: 'unknown' };
+                return UNKNOWN;
         }
     }
 
@@ -267,7 +294,7 @@ class Parser {
             }
             // will not error on multiple consecutive bad tokens
             // will error only if the previous token was known
-            should_error = statement.kind !== 'unknown';
+            should_error = statement !== UNKNOWN;
             statements.push(statement);
         }
 
@@ -292,7 +319,7 @@ class Parser {
             default:
                 this.queue_err_here('unrecognized header');
                 this.lexer.next();
-                return { kind: 'unknown' };
+                return UNKNOWN;
         }
     }
 
