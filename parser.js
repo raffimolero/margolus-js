@@ -9,6 +9,10 @@ function matches_or_eof(token, kinds) {
     return kinds.includes(token.kind) || token.kind === 'end of file';
 }
 
+function exact_or_eof(token, value) {
+    return token.value === value || token.kind === 'end of file';
+}
+
 class Parser {
     lexer;
     constructor(text) {
@@ -114,7 +118,7 @@ class Parser {
         default_value = MISSING_TOKEN_VALUE
     ) {
         let value = default_value;
-        let token = this.lexer.peek_after(WS);
+        const token = this.lexer.peek_after(WS);
         if (token.kind === token_kind) {
             value = token.value;
         } else {
@@ -141,14 +145,19 @@ class Parser {
         return { kind: 'rule', name };
     }
 
-    parse_punctuation(value, name, cue) {
-        const token = this.lexer.peek_after(WS);
+    /** err_cue is the item that signals the required punctuation, shown if not found */
+    parse_punctuation(spacing, value, name, err_cue) {
+        const token = this.lexer.peek_after(spacing);
         if (token.kind === 'punctuation') {
             this.lexer.next();
         }
-        if (token.value !== value) {
-            this.queue_err_here(`expected ${name} (punctuation) after ${cue}`);
+        const found = token.value === value;
+        if (!found) {
+            this.queue_err_here(
+                `expected ${name} (punctuation) after ${err_cue}`
+            );
         }
+        return found;
     }
 
     parse_field_colon_value(
@@ -158,7 +167,7 @@ class Parser {
         default_value = MISSING_TOKEN_VALUE
     ) {
         this.parse_exact_token(field_name);
-        this.parse_punctuation(':', 'colon', field_name);
+        this.parse_punctuation(WS, ':', 'colon', field_name);
         const value = this.parse_token_before_newline(
             field_name,
             token_kind,
@@ -194,15 +203,62 @@ class Parser {
     }
 
     /**
-     * item filter mapper must return either something to put into an array,
-     * or null if the list ends, usually because it found a stop token.
      *
-     * @param {(Token) => T | null} item_filter_mapper
-     * @param {[string]} allowed_spacing
+     * @param {[string]} spacing the tokens ignored between items and delimiters
+     * @param {string} delim_value the literal text of the delimiter
+     * @param {string} delim_name the english name for the delimiter, shown on error
+     * @param {string} end_value the literal text of the ending token
+     * @param {string} item_name the name for a list item, shown on error
+     * @param {function(): bool} list_ended should return true when the end of the list is reached
+     * @param {function(): T} parse_item should consume the next item and return something for the list
      * @returns {[T]}
      */
-    parse_comma_delimited(item_filter_mapper, allowed_spacing) {
-        // TODO:
+    parse_punct_delimited(
+        spacing,
+        delim_value,
+        delim_name,
+        end_value,
+        item_name,
+        parse_item
+    ) {
+        let expect_delim = false;
+        let errored = false;
+        const items = [];
+        const err_expect = () => {
+            if (expect_delim) {
+                this.queue_err_here(`expected ${delim_name} (punctuation)`);
+            } else {
+                this.queue_err_here(`expected ${item_name}`);
+            }
+        };
+        while (true) {
+            const token = this.lexer.peek_after(spacing);
+            if (token.kind === 'end of file') {
+                err_expect();
+            }
+            if (token.value === end_value) {
+                return items;
+            }
+            if (token.kind === 'punctuation') {
+                expect_delim = false;
+                if (token.value === delim_value) {
+                    if (!expect_delim && !errored) {
+                        errored = true;
+                        err_expect();
+                    }
+                } else {
+                    err_expect();
+                }
+                this.lexer.next();
+            } else {
+                if (expect_delim) {
+                    err_expect();
+                }
+                expect_delim = true;
+                errored = false;
+                items.push(parse_item());
+            }
+        }
     }
 
     /**
@@ -212,24 +268,41 @@ class Parser {
      * var a,b,c,d,e,f,g,h = { item, item, item }
      */
     parse_stsk_var() {
-        // TODO:
-        this.queue_err_here('NOT IMPLEMENTED');
-        this.lexer.peek_until(['newline']);
-        this.lexer.next();
-        return { kind: 'variable' };
-
         this.parse_exact_token('var');
 
-        let vars = [];
-        while (true) {
-            const token = this.lexer.peek_after(WS_NL);
-            if (this.token.kind === 'identifier') {
-                vars.push(this.token.value);
-                this.lexer.next();
-            } else {
-                this.queue_err_here('expected variable name (identifier)');
+        const names = this.parse_punct_delimited(
+            WS_NL,
+            ',',
+            'comma',
+            '=',
+            'variable name (identifier)',
+            () => {
+                console.log(this.lexer.next());
+                return UNKNOWN;
             }
-        }
+        );
+        this.parse_punctuation(WS_NL, '=', 'equals', 'variable name(s)');
+        this.parse_punctuation(
+            WS_NL,
+            '{',
+            'open brace',
+            'equals (punctuation)'
+        );
+        const values = this.parse_punct_delimited(
+            WS_NL,
+            ',',
+            'comma',
+            '}',
+            'state (number) or variable name (identifier)',
+            () => {
+                console.log(this.lexer.next());
+                return UNKNOWN;
+            }
+        );
+        this.parse_punctuation(WS_NL, '}', 'close brace', 'variable values');
+        this.parse_immediate_newline();
+
+        return { kind: 'var', names, values };
     }
 
     /**

@@ -13,6 +13,9 @@ class Lexer {
         this.text = text;
     }
 
+    // FOR ERRORS
+    times_eof_read = 0;
+
     index = 0;
     line = 1;
     col = 1;
@@ -30,10 +33,11 @@ class Lexer {
         ['neighborhood', /margolus|square4cyclic/y],
         ['symmetry', /(none)|rot([24])(ref)?|([xy])ref|(diag)/y], // use the capture group to figure out which one
         ['identifier', /[-_a-zA-Z][-_\w]*/y],
+        ['punctuation', /[,:={}]/y],
         // comma, colon, equal, and braces are for syntax
         // %^&* are indexing characters and were agreed on during this conversation:
         // https://discord.com/channels/357922255553953794/437055638376284161/1256579184793223198
-        ['punctuation', /[,:={}%^&*]/y],
+        ['special', /[%^&*]/y],
         ['newline', /\r?\n/y],
         ['comment', /#.*/y],
         ['header', /@[A-Z]*/y],
@@ -143,6 +147,13 @@ class Lexer {
 
             return out;
         }
+
+        // for debugging
+        this.times_eof_read++;
+        if (this.times_eof_read > 1_000) {
+            throw 'INFINITE LOOP DETECTED';
+        }
+
         return {
             kind: 'end of file',
             value: '',
