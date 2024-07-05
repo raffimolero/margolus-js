@@ -33,11 +33,10 @@ class Lexer {
         ['neighborhood', /margolus|square4cyclic/y],
         ['symmetry', /(none)|rot([24])(ref)?|([xy])ref|(diag)/y], // use the capture group to figure out which one
         ['identifier', /[-_a-zA-Z][-_\w]*/y],
-        ['punctuation', /[,:={}]/y],
         // comma, colon, equal, and braces are for syntax
         // %^&* are indexing characters and were agreed on during this conversation:
         // https://discord.com/channels/357922255553953794/437055638376284161/1256579184793223198
-        ['special', /[%^&*]/y],
+        ['punctuation', /[,:={}%^&*]/y],
         ['newline', /\r?\n/y],
         ['comment', /#.*/y],
         ['header', /@[A-Z]*/y],

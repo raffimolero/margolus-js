@@ -29,7 +29,8 @@ a, c, d, e : r, 31, gh, el
    
 `;
 
-test = `
+tests = [
+    `
 @RULE #asdlfjk;
 @RULE @RULE @RULE
 @RULE @TABLE
@@ -56,33 +57,15 @@ woah #another table
     symmetries   : moore
   neighborhood : none #asdfj
 
-`;
+`,
+    `@RULE Two
 
-const _ = `
+@TABLE
+  symmetries : none   # comment
+var a       , b,   c d,e,f,g,h = { 1, 2  4 8 abc 123}
 
-nl = /\r?\n/ TOKEN newline without any prior whitespace.
-comment = /#.*/ + nl
-ws = /\s+/ TOKEN whitespace like spaces or tabs, but not newlines.
-wsn = (ws | nl)+ TOKEN whitespace like spaces, tabs, or newlines.
-digit = /\d/
-num = digit+ TOKEN number.
-nonnum = /[A-Za-z\-_]/
-alphanum = nonnum | digit
-
-name = nonnum + alphanum* TOKEN names can only contain letters, numbers, dashes, or underscores. they cannot start with a number.
-
-rule = @RULE + ws + name + nl
-
-table = @TABLE + nl + statement*
-statement =
-    var
-    transition
-
-item = name | num TOKEN items must be state numbers, or names of other variables.
-delim = ',' | wsn
-var = 'var' + ws + name + ws? + '=' + ws? + '{' + delim* + item(delim)* + delim* '}' + wsn SYNTAX var <name> = { <name or number>, <name or number>, ... }
-
-`;
+  `,
+];
 
 function pront(thing, note = null) {
     let p = document.createElement('p');
@@ -93,7 +76,7 @@ function pront(thing, note = null) {
 
 pront('RUNNING RULE2.JS');
 
-const out = new Parser(test).parse(console.log);
+const out = new Parser(test, console.log).parse();
 console.log(out);
 
 // for (let i = 0; i < 1000; i++) {

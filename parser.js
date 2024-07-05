@@ -5,6 +5,14 @@ const WS_NL = WS.concat(NL);
 const MISSING_TOKEN_VALUE = 'MISSING';
 const UNKNOWN = { kind: 'unknown' };
 
+let REMOVE_ME = 0;
+function prevent_infinite() {
+    REMOVE_ME++;
+    if (REMOVE_ME > 1000) {
+        panic();
+    }
+}
+
 function matches_or_eof(token, kinds) {
     return kinds.includes(token.kind) || token.kind === 'end of file';
 }
@@ -15,8 +23,10 @@ function exact_or_eof(token, value) {
 
 class Parser {
     lexer;
-    constructor(text) {
+    output_err;
+    constructor(text, output_err) {
         this.lexer = new Lexer(text);
+        this.output_err = output_err;
     }
 
     err_queue = [];
@@ -48,7 +58,7 @@ class Parser {
     }
 
     /** converts an err command into actual text and sends it to `raise_err` */
-    raise_err_with(raise_err, err) {
+    raise_err(err) {
         const { message, context, token } = err;
         const { length, line, col, value } = this.lexer.token_info(token);
 
@@ -75,14 +85,28 @@ class Parser {
             error_msg += `\n${pre_context}\n${highlight_arrows}${post_context}`;
         }
         error_msg += '\n';
-        raise_err(error_msg);
+        this.output_err(error_msg);
     }
 
-    flush_errs(raise_err) {
+    flush_errs() {
         for (const err of this.err_queue) {
-            this.raise_err_with(raise_err, err);
+            this.raise_err(err);
         }
         this.err_queue = [];
+    }
+
+    finish() {
+        this.lexer.finish();
+        this.flush_errs();
+    }
+
+    fatal_error() {
+        this.queue_err_here(
+            'Parsing stopped. If I tried to continue, I would likely give unhelpful gibberish errors.',
+            null
+        );
+        this.finish();
+        throw 'major parse error.';
     }
 
     /** errors if the next token is not the provided value */
@@ -231,34 +255,83 @@ class Parser {
                 this.queue_err_here(`expected ${item_name}`);
             }
         };
+        // look man i don't know either
         while (true) {
             const token = this.lexer.peek_after(spacing);
             if (token.kind === 'end of file') {
                 err_expect();
+                break;
             }
             if (token.value === end_value) {
-                return items;
+                break;
             }
-            if (token.kind === 'punctuation') {
-                expect_delim = false;
-                if (token.value === delim_value) {
-                    if (!expect_delim && !errored) {
-                        errored = true;
-                        err_expect();
-                    }
-                } else {
+            if (token.value === delim_value) {
+                if (!expect_delim && !errored) {
+                    errored = true;
                     err_expect();
                 }
                 this.lexer.next();
+                expect_delim = false;
             } else {
+                // we have an item
                 if (expect_delim) {
                     err_expect();
+                    // "i'm gonna pretend i didn't see that"
+                    expect_delim = false;
                 }
-                expect_delim = true;
+
+                const item = parse_item();
+                if (item === UNKNOWN) {
+                    err_expect();
+                    this.fatal_error();
+                }
+                items.push(item);
+
                 errored = false;
-                items.push(parse_item());
+                expect_delim = true;
             }
         }
+        return items;
+    }
+
+    /**
+     * section table statement keyword var
+     * use when the next token is an identifier
+     */
+    parse_stskv_name() {
+        const token = this.lexer.peek();
+        if (token.kind !== 'identifier') {
+            this.queue_err_here('expected variable name (identifier)');
+            return UNKNOWN;
+        }
+        this.lexer.next();
+        return token.value;
+    }
+
+    /**
+     * section table statement keyword var
+     * use when the next token is the start of a variable value
+     */
+    parse_stskv_value() {
+        let token = this.lexer.peek();
+        let item = UNKNOWN;
+        switch (token.kind) {
+            case 'identifier':
+                item = { kind: 'var name', value: token.value };
+                this.lexer.next();
+                break;
+            case 'number':
+                item = { kind: 'state', value: parseInt(token.value) };
+                this.lexer.next();
+                break;
+            default:
+                this.queue_err_here(
+                    'expected state (number) or variable name (identifier)'
+                );
+                break;
+        }
+
+        return item;
     }
 
     /**
@@ -276,33 +349,31 @@ class Parser {
             'comma',
             '=',
             'variable name (identifier)',
-            () => {
-                console.log(this.lexer.next());
-                return UNKNOWN;
-            }
+            () => this.parse_stskv_name()
         );
-        this.parse_punctuation(WS_NL, '=', 'equals', 'variable name(s)');
-        this.parse_punctuation(
-            WS_NL,
-            '{',
-            'open brace',
-            'equals (punctuation)'
-        );
+        if (
+            !this.parse_punctuation(WS_NL, '=', 'equals', 'variable name(s)') ||
+            !this.parse_punctuation(
+                WS_NL,
+                '{',
+                'open brace',
+                'equals (punctuation)'
+            )
+        ) {
+            this.fatal_error();
+        }
         const values = this.parse_punct_delimited(
             WS_NL,
             ',',
             'comma',
             '}',
             'state (number) or variable name (identifier)',
-            () => {
-                console.log(this.lexer.next());
-                return UNKNOWN;
-            }
+            () => this.parse_stskv_value()
         );
         this.parse_punctuation(WS_NL, '}', 'close brace', 'variable values');
         this.parse_immediate_newline();
 
-        return { kind: 'var', names, values };
+        return { kind: 'var def', names, values };
     }
 
     /**
@@ -320,6 +391,26 @@ class Parser {
             default:
                 panic();
         }
+    }
+
+    /**
+     * section table statement transition:
+     * use when the next token is a transition item
+     */
+    parse_stst_item() {
+        let item = this.parse_stskv_value();
+        if (item === UNKNOWN) {
+            return item;
+        }
+
+        token = this.lexer.peek();
+        const index = '%^&*'.indexOf(token.value);
+        if (index !== -1) {
+            this.lexer.next();
+            item.index = index;
+        }
+
+        return item;
     }
 
     /** section table statement */
@@ -407,14 +498,9 @@ class Parser {
         };
     }
 
-    finish(raise_err) {
-        this.lexer.finish();
-        this.flush_errs(raise_err);
-    }
-
-    parse(raise_err) {
+    parse() {
         const out = this.parse_top_level();
-        this.finish(raise_err);
+        this.finish();
         return out;
     }
 }
