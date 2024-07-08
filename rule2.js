@@ -62,22 +62,38 @@ woah #another table
 
 @TABLE
   symmetries : none   # comment
-var a       , b,   c d,e,f,g,h = { 1, 2  4 8 abc 123}
+var a       , b,   c 
+
+
+d,e,f,g,h = { 1, 2 
+
+ #lalala
+
+4 8 abc 123}
 
   `,
 ];
 
 function pront(thing, note = null) {
+    const attached_note = note ? `[Note: ${note}] ` : '';
+    const text = `${attached_note}[${typeof thing}] ${thing}`;
+
+    // console.log(text); return;
     let p = document.createElement('p');
     document.body.appendChild(p);
-    const attached_note = note ? `[Note: ${note}] ` : '';
-    p.innerText = `${attached_note}[${typeof thing}] ${thing}`;
+    p.innerText = text;
 }
 
 pront('RUNNING RULE2.JS');
 
-const out = new Parser(test, console.log).parse();
-console.log(out);
+for (const test of tests) {
+    try {
+        const out = new Parser(test, console.log).parse();
+        console.log(out);
+    } catch (err) {
+        pront(err);
+    }
+}
 
 // for (let i = 0; i < 1000; i++) {
 //     const next = lex.next();

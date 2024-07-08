@@ -246,7 +246,6 @@ class Parser {
         parse_item
     ) {
         let expect_delim = false;
-        let errored = false;
         const items = [];
         const err_expect = () => {
             if (expect_delim) {
@@ -266,30 +265,25 @@ class Parser {
                 break;
             }
             if (token.value === delim_value) {
-                if (!expect_delim && !errored) {
-                    errored = true;
-                    err_expect();
-                }
                 this.lexer.next();
                 expect_delim = false;
-            } else {
-                // we have an item
-                if (expect_delim) {
-                    err_expect();
-                    // "i'm gonna pretend i didn't see that"
-                    expect_delim = false;
-                }
-
-                const item = parse_item();
-                if (item === UNKNOWN) {
-                    err_expect();
-                    this.fatal_error();
-                }
-                items.push(item);
-
-                errored = false;
-                expect_delim = true;
+                continue;
             }
+            // we have an item
+            if (expect_delim) {
+                err_expect();
+                // "i'm gonna pretend i didn't see that"
+                expect_delim = false;
+            }
+
+            const item = parse_item();
+            if (item === UNKNOWN) {
+                err_expect();
+                this.fatal_error();
+            }
+            items.push(item);
+
+            expect_delim = true;
         }
         return items;
     }
