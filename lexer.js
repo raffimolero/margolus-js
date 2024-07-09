@@ -1,3 +1,57 @@
+function punctuation_name(punct_val) {
+    return (
+        {
+            ',': 'comma',
+            ':': 'colon',
+            '=': 'equals sign',
+            '{': 'open brace',
+            '}': 'close brace',
+            '%': 'percent',
+            '^': 'caret',
+            '&': 'ampersand',
+            '*': 'asterisk',
+        }[punct_val] || 'unknown punctuation'
+    );
+}
+
+function punctuation_info(punct_val) {
+    return `${punctuation_name(punct_val)} ('${punct_val}', punctuation)`;
+}
+
+function token_info(token) {
+    const value = token.value;
+    const out = {
+        length: value.length,
+        line: token.line,
+        col: token.col,
+    };
+    switch (token.kind) {
+        case 'newline':
+            out.value = 'Newline';
+            return out;
+        case 'punctuation':
+            out.value = punctuation_info(value);
+            return out;
+        case 'illegal identifier':
+            out.value = `'${value}' (illegal identifier; must not start with a number)`;
+            return out;
+        case 'unknown':
+            const code = value.charCodeAt(0);
+            out.value = `'${value}' (unrecognized character, code: ${code})`;
+            return out;
+        case 'end of file':
+            out.length = 1;
+            out.value = 'End of File';
+            return out;
+        case 'shenanigans':
+            out.value = 'Unicode Reverse Shenanigans';
+            return out;
+        default:
+            out.value = `'${value}' (${token.kind})`;
+            return out;
+    }
+}
+
 /**
  * lexes stuff.
  *
@@ -42,37 +96,6 @@ class Lexer {
         ['header', /@[A-Z]*/y],
         ['unknown', /[\w\W]/y],
     ];
-
-    token_info(token) {
-        const value = token.value;
-        const out = {
-            length: value.length,
-            line: token.line,
-            col: token.col,
-        };
-        switch (token.kind) {
-            case 'newline':
-                out.value = 'Newline';
-                return out;
-            case 'illegal identifier':
-                out.value = `'${value}' (illegal identifier; must not start with a number)`;
-                return out;
-            case 'unknown':
-                const code = value.charCodeAt(0);
-                out.value = `'${value}' (unrecognized character, code: ${code})`;
-                return out;
-            case 'end of file':
-                out.length = 1;
-                out.value = 'End of File';
-                return out;
-            case 'shenanigans':
-                out.value = 'Unicode Reverse Shenanigans';
-                return out;
-            default:
-                out.value = `'${value}' (${token.kind})`;
-                return out;
-        }
-    }
 
     /** end_line is exclusive. */
     get_context_lines(start_line, end_line) {

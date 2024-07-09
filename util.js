@@ -15,3 +15,9 @@ function dbg(x) {
 function panic() {
     throw 'rsboi done goofed, did a bad, and used a function wrong. read the stack trace.';
 }
+
+/** in case we want the stack trace and to catch the error at the same time */
+function bail(msg) {
+    console.trace(msg);
+    throw msg;
+}

@@ -71,6 +71,10 @@ d,e,f,g,h = { 1, 2
 
 4 8 abc 123}
 
+       1 
+a , ,,, b c d : e g g d # comment
+a , ,,, b c d : e g g e d # comment
+
   `,
 ];
 
@@ -78,7 +82,9 @@ function pront(thing, note = null) {
     const attached_note = note ? `[Note: ${note}] ` : '';
     const text = `${attached_note}[${typeof thing}] ${thing}`;
 
-    // console.log(text); return;
+    console.log(text);
+    return;
+
     let p = document.createElement('p');
     document.body.appendChild(p);
     p.innerText = text;
@@ -88,7 +94,7 @@ pront('RUNNING RULE2.JS');
 
 for (const test of tests) {
     try {
-        const out = new Parser(test, console.log).parse();
+        const out = new Parser(test, pront).parse();
         console.log(out);
     } catch (err) {
         pront(err);
