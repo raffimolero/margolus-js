@@ -15,7 +15,7 @@ input, textarea, button, .tile {
 }
 
 textarea {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: monospace;
 }
 
 button {
