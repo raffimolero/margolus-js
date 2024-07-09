@@ -59,10 +59,16 @@ function token_info(token) {
  */
 class Lexer {
     text;
+    lines;
     constructor(text) {
         if (!text) {
             console.log('WARNING: This lexer does not have any text.');
         }
+        this.lines = [
+            0,
+            ...text.matchAll(/\n/g).map(match => match.index + 1),
+            text.length,
+        ];
         pront(text);
         this.text = text;
     }
@@ -73,7 +79,6 @@ class Lexer {
     index = 0;
     line = 1;
     col = 1;
-    lines = [0];
     current_token = null;
     // ordered by how likely i think they would appear.
     // only exceptions are special-cased identifiers.
@@ -81,12 +86,12 @@ class Lexer {
     regexes = [
         ['shenanigans', /‮/y],
         ['whitespace', /[\t\f\cK ]+/y],
+        ['illegal identifier', /\d+[-_a-zA-Z][-_\w]*/y],
         ['number', /\d+/y],
         ['keyword', /var|n_states|neighborhood|symmetries/y],
         ['neighborhood', /margolus|square4cyclic/y],
         ['symmetry', /(none)|rot([24])(ref)?|([xy])ref|(diag)/y], // use the capture group to figure out which one
         ['identifier', /[-_a-zA-Z][-_\w]*/y],
-        ['illegal identifier', /[-_\w]+/y],
         // comma, colon, equal, and braces are for syntax
         // %^&* are indexing characters and were agreed on during this conversation:
         // https://discord.com/channels/357922255553953794/437055638376284161/1256579184793223198
@@ -99,11 +104,6 @@ class Lexer {
 
     /** end_line is exclusive. */
     get_context_lines(start_line, end_line) {
-        // defensive programming
-        if (this.unfinished()) {
-            throw 'attempted to get context lines without lexer finishing.';
-        }
-
         const clamp = val => Math.max(0, Math.min(this.lines.length - 1, val));
         const start = this.lines[clamp(start_line)];
         let end = this.lines[clamp(end_line)];
@@ -119,12 +119,6 @@ class Lexer {
     /** returns true if end of file has not been reached. */
     unfinished() {
         return this.peek().kind !== 'end of file';
-    }
-
-    /** finishes lexing all tokens, making them accessible to get_context_lines */
-    finish() {
-        while (this.next().kind !== 'end of file') {}
-        this.lines.push(this.index);
     }
 
     /**
@@ -160,7 +154,6 @@ class Lexer {
 
             // handle line/column
             if (kind === 'newline') {
-                this.lines.push(this.index);
                 this.line++;
                 this.col = 1;
                 return out;
@@ -173,7 +166,7 @@ class Lexer {
         // for debugging
         this.times_eof_read++;
         if (this.times_eof_read > 1_000) {
-            throw 'INFINITE LOOP DETECTED';
+            yeet('INFINITE LOOP DETECTED');
         }
 
         return {

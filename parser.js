@@ -20,7 +20,7 @@ class Parser {
         this.output_err = output_err;
     }
 
-    err_queue = [];
+    errored = false;
 
     /**
      * `context` determines how verbose the error is.
@@ -41,16 +41,19 @@ class Parser {
         token = this.lexer.current_token
     ) {
         if (token === null) {
-            bail(
+            yeet(
                 'ATTEMPTED TO QUEUE ERROR WITH NULL TOKEN.\n\
                 This was probably caused by using lexer.next() before lexer.queue_err_here();\n\
                 Consider providing a token beforehand.'
             );
         }
-        this.err_queue.push({ message, context, token });
+        const err = { message, context, token };
+        // console.trace(err);
+        this.raise_err(err);
+        this.errored = true;
     }
 
-    /** converts an err command into actual text and sends it to `raise_err` */
+    /** converts an err command into actual text and sends it to `this.output_err` */
     raise_err(err) {
         const { message, context, token } = err;
         const { length, line, col, value } = token_info(token);
@@ -81,25 +84,12 @@ class Parser {
         this.output_err(error_msg);
     }
 
-    flush_errs() {
-        for (const err of this.err_queue) {
-            this.raise_err(err);
-        }
-        this.err_queue = [];
-    }
-
-    finish() {
-        this.lexer.finish();
-        this.flush_errs();
-    }
-
     fatal_error() {
         this.queue_err_here(
             'Parsing stopped. If I tried to continue, I would likely give unhelpful gibberish errors.',
             null
         );
-        this.finish();
-        bail('major parse error.');
+        yeet('major parse error.');
     }
 
     /** errors if the next token is not the provided value */
@@ -242,7 +232,7 @@ class Parser {
         err_on_no_delim,
         err_on_multi_delim
     ) {
-        let delims_in_a_row = 0;
+        let delims_in_a_row = 1;
         const items = [];
         const expecting_delim = () => err_on_no_delim && delims_in_a_row === 0;
         const err_expect = () => {
@@ -270,9 +260,7 @@ class Parser {
             if (token.value === delim_value) {
                 delims_in_a_row++;
                 if (err_on_multi_delim && delims_in_a_row === 2) {
-                    this.queue_err_here(
-                        `max one ${punctuation_info(delim_value)} between items`
-                    );
+                    err_expect();
                 }
                 this.lexer.next();
                 continue;
@@ -288,13 +276,11 @@ class Parser {
 
             const item = parse_item();
             if (item === UNKNOWN) {
-                err_expect();
-
                 if (spacing.includes('newline')) {
                     this.fatal_error();
                 } else {
-                    this.lexer.peek_after(WS_NL);
-                    return UNKNOWN;
+                    this.lexer.peek_until(NL);
+                    return items;
                 }
             }
             items.push(item);
@@ -440,13 +426,18 @@ class Parser {
         }
         if (block.length !== 4) {
             const end_idx = this.lexer.index;
-            this.queue_err_here(`expected exactly 4 items`, undefined, {
-                kind: `${block.length}-item margolus block`,
-                value: this.lexer.text.slice(start_idx, end_idx),
-                line,
-                col: start_col,
-            });
-            return UNKNOWN;
+            this.queue_err_here(
+                `expected margolus block with exactly 4 items`,
+                undefined,
+                {
+                    kind: `${block.length}-item margolus block`,
+                    value: this.lexer.text.slice(start_idx, end_idx),
+                    line,
+                    col: start_col,
+                }
+            );
+
+            return MISSING;
         }
         return block;
     }
@@ -454,12 +445,22 @@ class Parser {
     /** section table statement */
     parse_sts_transition() {
         const from = this.parse_stst_block(exact_or_eof(':'));
+        if (from === MISSING) {
+            this.queue_err_here(
+                'Did you misspell symmetries or neighborhood?',
+                null
+            );
+            this.lexer.peek_until(NL);
+            return UNKNOWN;
+        }
         if (from === UNKNOWN) {
+            this.lexer.peek_until(NL);
             return UNKNOWN;
         }
         this.parse_punctuation(WS, ':', 'last item in block');
         const to = this.parse_stst_block(matches_or_eof(NL));
         if (to === UNKNOWN) {
+            this.lexer.peek_until(NL);
             return UNKNOWN;
         }
         this.parse_immediate_newline('transition');
@@ -544,8 +545,6 @@ class Parser {
     }
 
     parse() {
-        const out = this.parse_top_level();
-        this.finish();
-        return out;
+        return { ast: this.parse_top_level(), errored: this.errored };
     }
 }

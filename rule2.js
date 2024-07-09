@@ -57,6 +57,10 @@ woah #another table
     symmetries   : moore
   neighborhood : none #asdfj
 
+  var x = { 1, 2, 3, 4, 4
+
+  a, b c d : e fg g h #com
+
 `,
     `@RULE Two
 
