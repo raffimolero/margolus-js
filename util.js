@@ -12,14 +12,14 @@ function dbg(x) {
     return x;
 }
 
-function panic() {
-    bail(
-        'rsboi done goofed, did a bad, and used a function wrong. read the stack trace.'
-    );
-}
-
-/** in case we want the stack trace and to catch the error at the same time */
-function bail(msg) {
+/** in case we want the stack trace while catching the error at the same time */
+function yeet(msg) {
     console.trace(msg);
     throw msg;
+}
+
+function panic() {
+    yeet(
+        'rsboi done goofed, did a bad, and used a function wrong. read the stack trace.'
+    );
 }
