@@ -55,6 +55,7 @@ class Parser {
 
     /** converts an err command into actual text and sends it to `this.output_err` */
     raise_err(err) {
+        // TODO: line numbers, border around code block
         const { message, context, token } = err;
         const { length, line, col, value } = token_info(token);
 

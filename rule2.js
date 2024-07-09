@@ -120,19 +120,13 @@ function clera() {
 }
 clera();
 
-// TODO: if no errors were found, turn the AST into an interpreted transition table
+// TODO: if no errors were found, turn the AST into a workable transition table
 
-function do_tests() {
-    for (const test of tests) {
-        try {
-            const out = new Parser(test, pront).parse();
-            console.log(out);
-        } catch (err) {
-            pront(err);
-        }
-    }
+const random_test = new RandomBag(tests);
+function randomTest() {
+    rule_box.value = random_test.next();
+    getAndParseRule();
 }
-// do_tests();
 
 function getAndParseRule() {
     const test = rule_box.value;
