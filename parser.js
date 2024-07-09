@@ -526,6 +526,9 @@ class Parser {
             case '@TABLE':
                 return this.parse_section_table();
             // TODO: maybe @COLORS
+            case '':
+                // end of file reached because previous section had a parse error
+                return UNKNOWN;
             default:
                 this.queue_err_here('unrecognized header');
                 this.lexer.next();

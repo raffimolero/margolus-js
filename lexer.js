@@ -69,7 +69,6 @@ class Lexer {
             ...text.matchAll(/\n/g).map(match => match.index + 1),
             text.length,
         ];
-        pront(text);
         this.text = text;
     }
 

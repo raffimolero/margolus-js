@@ -6,6 +6,36 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="rule-form">
+      <textarea rows="24" cols="80" id="rule" placeholder="Rule table">@RULE DLA
+
+@TABLE
+symmetries:rot4ref
+
+# The Margolus transition a,b,c,d : e,f,g,h means:
+#
+#      a  b   becomes    e  f
+#      c  d              g  h
+
+# 0: vacuum
+# 1: gas particle
+# 2: stuck particle
+
+# random gas-like rules:
+1,0,0,0 : 0,0,0,1 # a diagonally-travelling particle keeps going
+1,1,0,0 : 1,1,0,0 # two particles collide
+0,1,1,0 : 1,0,0,1 # two particles collide head-on
+1,1,1,0 : 1,1,0,1 # three particles pass through each other
+
+# plus aggregation rules: (these seem to suffice)
+1,0,2,0 : 2,0,2,0
+1,0,2,2 : 2,0,2,2
+</textarea>
+      <textarea rows="2" cols="80" id="errors" placeholder="..."></textarea>
+      <br>
+      <button onclick="getAndParseRule()">Load Rule</button>
+    </div>
+
     <script src="util.js"></script>
     <script src="lexer.js"></script>
     <script src="parser.js"></script>
