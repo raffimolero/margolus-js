@@ -156,19 +156,24 @@ class Lexer {
 
     /** returns the next recognized token in the text. */
     read_token() {
+        const out = {
+            kind: undefined,
+            value: undefined,
+            captures: undefined,
+            line: this.line,
+            col: this.col,
+            index: this.index,
+        };
         for (const [kind, regex] of this.regexes) {
             const match = this.try_regex(regex);
             if (match === null) {
                 continue;
             }
             const value = match.shift();
-            const out = {
-                kind,
-                value,
-                captures: match,
-                line: this.line,
-                col: this.col,
-            };
+
+            out.kind = kind;
+            out.value = value;
+            out.captures = match;
 
             // handle line/column
             if (kind === 'newline') {

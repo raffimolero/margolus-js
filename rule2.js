@@ -118,7 +118,6 @@ function clera() {
     err_box.rows = 2;
     err_box.placeholder = err_box_messages.next();
 }
-clera();
 
 // TODO: if no errors were found, turn the AST into a workable transition table
 
@@ -141,6 +140,7 @@ function getAndParseRule() {
         pront(err);
     }
 }
+getAndParseRule();
 
 // for (let i = 0; i < 1000; i++) {
 //     const next = lex.next();

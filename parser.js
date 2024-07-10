@@ -415,9 +415,10 @@ class Parser {
      * parses 4 items in a margolus block.
      */
     parse_stst_block(matches_list_end) {
-        const start_idx = this.lexer.index;
-        const start_col = this.lexer.col;
-        const line = this.lexer.line;
+        const token = this.lexer.peek();
+        const start_idx = token.index;
+        const start_col = token.col;
+        const line = token.line;
         const block = this.parse_punct_delimited(
             WS,
             ',',
@@ -431,7 +432,7 @@ class Parser {
             return UNKNOWN;
         }
         if (block.length !== 4) {
-            const end_idx = this.lexer.index;
+            const end_idx = this.lexer.peek().index;
             this.queue_err_here(
                 `expected margolus block with exactly 4 items`,
                 undefined,
