@@ -64,11 +64,11 @@ class Lexer {
         if (!text) {
             console.log('WARNING: This lexer does not have any text.');
         }
-        this.lines = [
-            0,
-            ...text.matchAll(/\n/g).map(match => match.index + 1),
-            text.length,
-        ];
+        this.lines = [0];
+        for (const match of text.matchAll(/\n/g)) {
+            this.lines.push(match.index + 1);
+        }
+        this.lines.push(text.length);
         this.text = text;
     }
 
