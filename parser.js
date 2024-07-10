@@ -55,7 +55,6 @@ class Parser {
 
     /** converts an err command into actual text and sends it to `this.output_err` */
     raise_err(err) {
-        // TODO: line numbers, border around code block
         const { message, context, token } = err;
         const { length, line, col, value } = token_info(token);
 
@@ -78,8 +77,14 @@ class Parser {
             if (post_context) {
                 post_context = '\n' + post_context;
             }
-            const highlight_arrows = ' '.repeat(col - 1) + '^'.repeat(length);
-            error_msg += `\n${pre_context}\n${highlight_arrows}${post_context}`;
+
+            const left_pad = this.lexer.code_block_padding();
+            const BAR_LENGTH = 40;
+            const bar = ' '.repeat(left_pad) + '-'.repeat(BAR_LENGTH);
+            const highlight_arrows =
+                ' '.repeat(col - 1 + left_pad) + '^'.repeat(length);
+
+            error_msg += `\n${bar}\n${pre_context}${highlight_arrows}${post_context}${bar}`;
         }
         error_msg += '\n';
         this.output_err(error_msg);

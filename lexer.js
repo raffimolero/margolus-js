@@ -101,18 +101,37 @@ class Lexer {
         ['unknown', /[\w\W]/y],
     ];
 
+    line_num_digits() {
+        return this.lines.length.toString().length;
+    }
+
+    /** gets how much padding is used for the line numbers */
+    code_block_padding() {
+        return this.line_num_digits() + 4;
+    }
+
     /** end_line is exclusive. */
     get_context_lines(start_line, end_line) {
         const clamp = val => Math.max(0, Math.min(this.lines.length - 1, val));
-        const start = this.lines[clamp(start_line)];
-        let end = this.lines[clamp(end_line)];
+        start_line = clamp(start_line);
+        end_line = clamp(end_line);
+        const start = this.lines[start_line];
+        let end = this.lines[end_line];
         if (this.text[end - 1] === '\n') {
             end--;
             if (this.text[end - 1] === '\r') {
                 end--;
             }
         }
-        return this.text.slice(start, end);
+        const raw = this.text.slice(start, end);
+        const pad = this.line_num_digits();
+        let out = '';
+        for (const line of raw.split('\n')) {
+            start_line++;
+            const line_number = start_line.toString().padStart(pad);
+            out += ` ${line_number} | ${line}\n`;
+        }
+        return out;
     }
 
     /** returns true if end of file has not been reached. */
